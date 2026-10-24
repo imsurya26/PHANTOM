@@ -55,7 +55,7 @@ export function createVercelHandler({
     try {
       if (
         ['/api/providers/status', '/api/phantom/provider-status'].includes(
-          raw,
+          path,
         ) &&
         req.method === 'GET'
       ) {
