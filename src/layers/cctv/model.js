@@ -440,7 +440,11 @@ export function createModel({ state: layerState, services, parts, source }) {
 
   function projectionLoopIsNeeded() {
     if (!layerState._enabled || !layerState._viewer) return false;
-    if (layerState._showProjection && parts.selection.getActiveRecord())
+    if (
+      layerState._showProjection &&
+      layerState._watchCameraId &&
+      parts.selection.getActiveRecord()
+    )
       return true;
     return focusPassIsNeeded(
       getFocusTarget(),
@@ -463,6 +467,7 @@ export function createModel({ state: layerState, services, parts, source }) {
    */
 
   function cardFrameTick() {
+    if (!layerState._watchCameraId) return;
     if (
       !layerState._enabled ||
       (!layerState._cardIds.size &&

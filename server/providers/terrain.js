@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
+import { BoundedCache } from '../cache/bounded.js';
 
 import {
   fetchTerrainChunkWithRetry,
@@ -36,7 +37,12 @@ export function terrainHeightsProxy() {
   const MAX_POINTS = 2000;
 
   /** @type {Map<string, {at:number, result:object}>} keyed by canonical 5dp lon/lat. */
-  const mem = new Map();
+  const MAX_CACHE_BYTES = 4 * 1024 * 1024;
+  const mem = new BoundedCache({
+    maxEntries: 20000,
+    maxBytes: MAX_CACHE_BYTES,
+    ttlMs: TTL_MS * 2,
+  });
   /** @type {Map<string, Promise<Array<object>>>} single-flight per missing-point subset. */
   const inflight = new Map();
   let diskLoaded = false;
@@ -47,6 +53,8 @@ export function terrainHeightsProxy() {
     if (diskLoaded) return;
     diskLoaded = true;
     try {
+      if ((await fsp.stat(CACHE_PATH)).size > MAX_CACHE_BYTES)
+        throw new Error('Cache exceeds limit');
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
       const pointEntries =
         parsed?.version === 2 &&
@@ -59,9 +67,11 @@ export function terrainHeightsProxy() {
           if (
             entry &&
             Number.isFinite(entry.at) &&
+            Date.now() - entry.at < TTL_MS * 2 &&
+            entry.at <= Date.now() &&
             validTerrainResult(entry.result)
           ) {
-            mem.set(key, entry);
+            mem.set(key, entry, TTL_MS * 2 - (Date.now() - entry.at));
           }
         }
       } else if (parsed && typeof parsed === 'object') {
@@ -73,6 +83,8 @@ export function terrainHeightsProxy() {
             !points ||
             !entry ||
             !Number.isFinite(entry.at) ||
+            Date.now() - entry.at >= TTL_MS * 2 ||
+            entry.at > Date.now() ||
             !Array.isArray(entry.results)
           )
             continue;
@@ -82,7 +94,11 @@ export function terrainHeightsProxy() {
             const key = terrainPointKey(points[i]);
             const existing = mem.get(key);
             if (!existing || entry.at > existing.at)
-              mem.set(key, { at: entry.at, result });
+              mem.set(
+                key,
+                { at: entry.at, result },
+                TTL_MS * 2 - (Date.now() - entry.at),
+              );
           }
         }
         diskDirty = mem.size > 0;
@@ -98,7 +114,9 @@ export function terrainHeightsProxy() {
       try {
         await fsp.mkdir(CACHE_DIR, { recursive: true });
         const obj = { version: 2, points: Object.fromEntries(mem.entries()) };
-        await fsp.writeFile(CACHE_PATH, JSON.stringify(obj), 'utf8');
+        const serialized = JSON.stringify(obj);
+        if (Buffer.byteLength(serialized) <= MAX_CACHE_BYTES)
+          await fsp.writeFile(CACHE_PATH, serialized, 'utf8');
       } catch (err) {
         diskDirty = true; // retry next tick
         console.warn('[terrain-heights-proxy] cache write failed');
@@ -147,6 +165,7 @@ export function terrainHeightsProxy() {
   function fetchMissingSingleFlight(points) {
     const key = points.map(terrainPointKey).join(';');
     if (!inflight.has(key)) {
+      if (inflight.size >= 4) return Promise.reject(new Error('Terrain busy'));
       const request = fetchUpstreamAll(points).finally(() => {
         if (inflight.get(key) === request) inflight.delete(key);
       });
@@ -175,7 +194,7 @@ export function terrainHeightsProxy() {
           return;
         }
         if (points.length > MAX_POINTS) {
-          send(500, {
+          send(400, {
             error: `too many points (${points.length}); max ${MAX_POINTS} per request`,
           });
           return;

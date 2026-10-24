@@ -147,7 +147,7 @@ test('concurrent malformed-file repairs return the same persisted key', async (t
       }
       return text;
     };
-    process.stdout.write(sharedPanelKey({ file }));
+    process.stdout.write(sharedPanelKey({ file, log: (line) => process.stderr.write(line + '\\n') }));
   `;
   const run = (index) =>
     new Promise((resolve, reject) => {
@@ -180,6 +180,34 @@ test('concurrent malformed-file repairs return the same persisted key', async (t
     fs.readdirSync(path.dirname(file)).some((name) => name.endsWith('.tmp')),
     false,
   );
+});
+
+test('a transient Windows rename sharing conflict retains the repair lock and persisted key', (t) => {
+  const file = tempKeyFile(t);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, 'not a key\n');
+  const rename = fs.renameSync;
+  let attempts = 0;
+  const logged = [];
+  fs.renameSync = function (source, destination) {
+    if (destination === file) {
+      assert.equal(fs.existsSync(`${file}.repair-lock`), true);
+      if (++attempts <= 3)
+        throw Object.assign(new Error('sharing conflict'), { code: 'EPERM' });
+    }
+    return rename.call(this, source, destination);
+  };
+  let key;
+  try {
+    key = sharedPanelKey({ file, log: (line) => logged.push(line) });
+  } finally {
+    fs.renameSync = rename;
+  }
+  assert.equal(attempts, 4);
+  assert.equal(fs.readFileSync(file, 'utf8').trim(), key);
+  assert.equal(sharedPanelKey({ file }), key);
+  assert.deepEqual(logged, []);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ['mcp-panel-key']);
 });
 
 test('an unavailable repair lock falls back without hanging or removing its owner’s lock', (t) => {

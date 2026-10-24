@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
+import { readResponseBytesCapped } from './common/http.js';
 
 import {
   isValidTileCoord as isValidTomTomTile,
@@ -48,6 +49,10 @@ export function tomtomProxy() {
   const DEFAULT_DAILY_BUDGET = 6000;
   const MEM_MAX_ENTRIES = 256;
   const UPSTREAM_TIMEOUT_MS = 15000;
+  const MAX_TILE_BYTES = 2 * 1024 * 1024;
+  const MAX_MEMORY_BYTES = 32 * 1024 * 1024;
+  let memBytes = 0;
+  let cooldownUntil = 0;
 
   /** @type {Map<string, {at:number, buf:Buffer}>} tile key `z/x/y` -> cached tile (kept past TTL for serve-stale). */
   const mem = new Map();
@@ -85,7 +90,7 @@ export function tomtomProxy() {
       await fsp.mkdir(CACHE_DIR, { recursive: true });
       await fsp.writeFile(BUDGET_PATH, JSON.stringify(budget), 'utf8');
     } catch (err) {
-      console.warn('[tomtom-proxy] budget write failed:', err?.message || err);
+      console.warn('[tomtom-proxy] budget write failed');
     }
   }
 
@@ -107,10 +112,11 @@ export function tomtomProxy() {
   /** Disk-cache read; tile age comes from the file's mtime. */
   async function readDiskTile(key) {
     try {
-      const [stat, buf] = await Promise.all([
-        fsp.stat(tilePath(key)),
-        fsp.readFile(tilePath(key)),
-      ]);
+      const stat = await fsp.stat(tilePath(key));
+      if (stat.size > MAX_TILE_BYTES || Date.now() - stat.mtimeMs > 3600_000)
+        return null;
+      const buf = await fsp.readFile(tilePath(key));
+      if (buf.length > MAX_TILE_BYTES) return null;
       return { at: stat.mtimeMs, buf };
     } catch {
       return null;
@@ -122,20 +128,26 @@ export function tomtomProxy() {
       await fsp.mkdir(CACHE_DIR, { recursive: true });
       await fsp.writeFile(tilePath(key), buf);
     } catch (err) {
-      console.warn(
-        `[tomtom-proxy] tile cache write failed for ${key}:`,
-        err?.message || err,
-      );
+      console.warn('[tomtom-proxy] tile cache write failed');
     }
   }
 
   /** LRU-ish memory insert (Map preserves insertion order; evict the oldest). */
   function memSet(key, entry) {
-    if (!mem.has(key) && mem.size >= MEM_MAX_ENTRIES) {
+    if (mem.has(key)) {
+      memBytes -= mem.get(key).buf.length;
+      mem.delete(key);
+    }
+    while (
+      mem.size >= MEM_MAX_ENTRIES ||
+      memBytes + entry.buf.length > MAX_MEMORY_BYTES
+    ) {
       const oldest = mem.keys().next().value;
+      memBytes -= mem.get(oldest).buf.length;
       mem.delete(oldest);
     }
     mem.set(key, entry);
+    memBytes += entry.buf.length;
   }
 
   async function fetchUpstream(z, x, y) {
@@ -143,11 +155,12 @@ export function tomtomProxy() {
       'https://api.tomtom.com/traffic/map/4/tile/flow/relative/' +
       `${z}/${x}/${y}.pbf?key=${encodeURIComponent(process.env.TOMTOM_API_KEY)}`;
     recordUpstreamFetch(); // attempts count — upstream bills the request either way
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
+    const signal = AbortSignal.timeout(UPSTREAM_TIMEOUT_MS);
+    const res = await fetch(url, { signal, redirect: 'error' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
+    const buf = Buffer.from(
+      await readResponseBytesCapped(res, MAX_TILE_BYTES, signal),
+    );
     if (buf.length === 0) throw new Error('empty tile body');
     return buf;
   }
@@ -176,6 +189,8 @@ export function tomtomProxy() {
       };
 
       try {
+        if (req.method !== 'GET')
+          return sendJson(405, { error: 'method_not_allowed' });
         await loadBudgetOnce();
         const urlPath = String(req.url || '').split('?')[0];
 
@@ -212,6 +227,11 @@ export function tomtomProxy() {
         const now = Date.now();
 
         let entry = mem.get(key);
+        if (entry && now - entry.at > 3600_000) {
+          memBytes -= entry.buf.length;
+          mem.delete(key);
+          entry = null;
+        }
         if (!entry) {
           entry = await readDiskTile(key);
           if (entry) memSet(key, entry);
@@ -234,6 +254,10 @@ export function tomtomProxy() {
 
         // Stale or missing → refresh, single-flight per tile.
         if (!inflight.has(key)) {
+          if (inflight.size >= 8 || Date.now() < cooldownUntil) {
+            if (entry) return sendTile(entry.buf, 'STALE-BUSY');
+            return sendJson(503, { error: 'busy' }, { 'Retry-After': '30' });
+          }
           inflight.set(
             key,
             fetchUpstream(z, x, y)
@@ -244,8 +268,9 @@ export function tomtomProxy() {
                 return fresh;
               })
               .catch((err) => {
+                cooldownUntil = Math.max(cooldownUntil, Date.now() + 30_000);
                 console.warn(
-                  `[tomtom-proxy] ${key} fetch failed (${err?.message || err}) — serving stale if any`,
+                  '[tomtom-proxy] fetch failed — serving stale if any',
                 );
                 return null;
               })
@@ -261,7 +286,7 @@ export function tomtomProxy() {
           sendJson(502, { error: 'upstream' });
         }
       } catch (err) {
-        console.warn('[tomtom-proxy] error:', err?.message || err);
+        console.warn('[tomtom-proxy] request failed');
         sendJson(500, { error: 'proxy' });
       }
     });

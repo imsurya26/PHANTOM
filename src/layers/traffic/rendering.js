@@ -37,6 +37,11 @@ export function createRendering({
   /** Remove both heat-line ground primitives from the scene. */
 
   function removeHeatLines() {
+    if (layerState._roadOverlay) {
+      layerState._viewer?.scene.primitives.remove(layerState._roadOverlay);
+      layerState._roadOverlay = null;
+      layerState._roadOverlayItems = null;
+    }
     if (layerState._heatJamPrim) {
       layerState._viewer?.scene.groundPrimitives.remove(
         layerState._heatJamPrim,
@@ -65,6 +70,10 @@ export function createRendering({
    */
 
   function rebuildHeatLines(roads) {
+    if (layerState._operationalRoads) {
+      renderOperationalRoads(roads);
+      return;
+    }
     removeHeatLines();
     if (
       !layerState._viewer ||
@@ -178,6 +187,12 @@ export function createRendering({
     trace = null,
     replace = true,
   ) {
+    if (layerState._operationalRoads) {
+      layerState._lastPaintStage = label;
+      layerState._lastRenderAltitude = altitude;
+      renderOperationalRoads(visibleRoadsForAltitude(roads, altitude), replace);
+      return;
+    }
     const state =
       TRAFFIC_TIMING_ENABLED && trace
         ? parts.timing.trafficTimingRenderState(trace, label)
@@ -308,6 +323,86 @@ export function createRendering({
         renderMetrics,
       );
     }
+  }
+  /** Stable road lines: reference gray, measured flow colored, no invented cars. */
+  function renderOperationalRoads(roads, replace = true) {
+    const viewer = layerState._viewer;
+    if (!viewer) return;
+    if (!layerState._roadOverlay) {
+      layerState._roadOverlay = viewer.scene.primitives.add(
+        new Cesium.PolylineCollection(),
+      );
+      layerState._roadOverlayItems = new Map();
+    }
+    const items = layerState._roadOverlayItems;
+    const wanted = new Set();
+    const visible = roads
+      .slice(0, HEAT_LINE_CAP)
+      .filter((road) => road.waypoints?.length >= 2);
+    for (const road of visible) wanted.add(road.key || road.id || road);
+    if (replace)
+      for (const [key, item] of items)
+        if (!wanted.has(key)) {
+          layerState._roadOverlay.remove(item.line);
+          items.delete(key);
+        }
+    for (const road of visible) {
+      if (!road.waypoints || road.waypoints.length < 2) continue;
+      const key = road.key || road.id || road;
+      wanted.add(key);
+      const flow =
+        layerState._liveMode && !layerState._flowError ? road.flow : null;
+      const bucket = flow
+        ? flow.closure
+          ? 'jam'
+          : flowBucket(flow.level)
+        : 'sim';
+      const color =
+        bucket === 'jam'
+          ? Cesium.Color.ORANGERED
+          : bucket === 'slow'
+            ? Cesium.Color.ORANGE
+            : bucket === 'free'
+              ? Cesium.Color.LIMEGREEN
+              : Cesium.Color.SLATEGRAY;
+      let item = items.get(key);
+      if (!item) {
+        if (items.size >= HEAT_LINE_CAP) continue;
+        item = {
+          line: layerState._roadOverlay.add({
+            positions: road.waypoints,
+            width: flow ? 3 : 2,
+            material: Cesium.Material.fromType('Color', { color }),
+          }),
+        };
+        items.set(key, item);
+      } else {
+        item.line.positions = road.waypoints;
+        item.line.width = flow ? 3 : 2;
+        item.line.material.uniforms.color = color;
+      }
+      item.bucket = bucket;
+      item.reference = !road.directFlow;
+      item.road = road;
+    }
+    if (replace)
+      for (const [key, item] of items)
+        if (!wanted.has(key)) {
+          layerState._roadOverlay.remove(item.line);
+          items.delete(key);
+        }
+    layerState._bucketCounts = { free: 0, slow: 0, jam: 0, sim: 0 };
+    layerState._roads = [...items.values()].map((item) => item.road);
+    for (const item of items.values()) layerState._bucketCounts[item.bucket]++;
+    layerState._count = items.size;
+    layerState._heatLineCount = items.size;
+    layerState._lastUpdate = Date.now();
+    if ([...items.values()].some((item) => item.reference))
+      services.credits?.showOsmCredit?.(viewer, 'traffic', {
+        openMapTiles: true,
+      });
+    else services.credits?.hideOsmCredit?.(viewer, 'traffic');
+    viewer.scene.requestRender?.();
   }
   return {
     visibleRoadsForAltitude,

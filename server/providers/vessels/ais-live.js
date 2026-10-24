@@ -145,7 +145,7 @@ export function aisLiveProxy() {
         res.setHeader('Cache-Control', 'no-store');
         res.end(
           JSON.stringify({
-            error: error?.message || 'AIS live stream error',
+            error: 'AIS live stream error',
             rows: [],
           }),
         );
@@ -198,7 +198,6 @@ function aisWebSocketImpl() {
     _aisWebSocketImpl = null;
     console.warn(
       '[AISStream] `ws` is unavailable; the live vessel feed is off.',
-      error?.message || '',
     );
   }
   return _aisWebSocketImpl;
@@ -260,7 +259,7 @@ function aisAdapter() {
     resolveUrl: () => aisWatchdogPolicy().url,
     buildSubscription: aisStreamSubscription,
     ingestEnvelope: ingestAisStreamEnvelope,
-    warn: (message) => console.warn(message),
+    warn: () => console.warn('[AISStream] transport warning'),
   });
   _aisAdapter.setWatchdogOptions(aisWatchdogBudgets());
   return _aisAdapter;
@@ -294,6 +293,15 @@ function aisKeyFingerprint() {
  */
 function ensureAisStreamConnection() {
   const adapter = aisAdapter();
+  if (
+    String(process.env.PHANTOM_DISABLED_PROVIDERS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .includes('aisstream')
+  ) {
+    adapter.dispose();
+    return;
+  }
   if (_aisNeedsRearm) {
     // Post-dispose re-arm, now that the restarted server's .env is loaded. The
     // adapter keeps its generation namespace across this.
@@ -311,7 +319,13 @@ function ensureAisStreamConnection() {
 /** Status metadata for /api/vessels, safe to call before the first connect. */
 function aisStreamStatusSnapshot() {
   const snapshot = _aisAdapter ? _aisAdapter.snapshot() : null;
-  if (snapshot) return snapshot;
+  if (snapshot)
+    return {
+      ...snapshot,
+      error: snapshot.error
+        ? 'AISStream feed unavailable; check server provider configuration.'
+        : null,
+    };
   return {
     status: process.env.AISSTREAM_API_KEY ? 'idle' : 'missing-key',
     error: process.env.AISSTREAM_API_KEY
@@ -336,7 +350,7 @@ function startAisStreamWatchdogTick() {
     try {
       ensureAisStreamConnection();
     } catch (error) {
-      console.warn('[AISStream] watchdog tick failed', error?.message || '');
+      console.warn('[AISStream] watchdog tick failed');
     }
   }, AISSTREAM_TICK_MS);
   _aisStreamTickTimer.unref?.();

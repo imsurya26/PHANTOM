@@ -191,7 +191,14 @@ const RULES = flattenRules(css);
 
 // Selectors that position a modelled element's OWN box. Anything else that
 // positions one of these elements is an unmodelled construct and fails.
+const PHANTOM_CREDIT =
+  'body.phantom:not(.ui-clean-view):not(.recording-mode) #cesium-credits';
+const PHANTOM_MINIMAL_CREDIT =
+  "body.phantom:not(.ui-clean-view):not(.recording-mode):has(#intel-hud[data-variant='minimal'].active) #cesium-credits";
+const PHANTOM_DOCK = '.phantom #command-dock';
+const PHANTOM_RAIL = 'body.phantom #right-context-rail';
 const RECOGNIZED = new Set([
+  PHANTOM_CREDIT, PHANTOM_MINIMAL_CREDIT, PHANTOM_DOCK, PHANTOM_RAIL,
   // credit
   '#cesium-credits',
   'body:not(.ui-clean-view):not(.recording-mode) #cesium-credits',
@@ -619,4 +626,84 @@ test('the credit line is never suppressed to make room', () => {
 test('OSM-derived layers never force the desktop credit row into a stack', () => {
   assert.doesNotMatch(css, /body:has\([^)]*alpr-cameras[^}]*#cesium-credits/);
   assert.doesNotMatch(css, /#cesium-credits\s+\.cesium-credit-expand-link\s*\{[^}]*display:\s*block/);
+});
+
+test('PHANTOM attribution clears navigation, dock trays and full-width rails', () => {
+  for (const width of WIDTHS)
+    for (const height of HEIGHTS) {
+      const credit = toPx(
+        resolve(
+          [...CREDIT_SELECTORS, PHANTOM_CREDIT],
+          'bottom',
+          width,
+          'PHANTOM credit',
+        ).decl.value,
+        height,
+        'PHANTOM credit',
+      );
+      assert.equal(
+        toPx(
+          resolve(
+            [PHANTOM_MINIMAL_CREDIT],
+            'bottom',
+            width,
+            'PHANTOM minimal credit',
+          ).decl.value,
+          height,
+          'PHANTOM minimal credit',
+        ),
+        credit,
+      );
+      const dock = toPx(
+        resolve(
+          ['#command-dock', PHANTOM_DOCK],
+          'bottom',
+          width,
+          'PHANTOM dock',
+        ).decl.value,
+        height,
+        'PHANTOM dock',
+      );
+      assert.ok(
+        credit >= dock + COMPACT_DOCK_HEIGHT_PX + MIN_CLEARANCE_PX,
+        'PHANTOM dock covers attribution',
+      );
+      assert.ok(
+        credit >= (width <= 850 ? 66 : 30),
+        'PHANTOM navigation covers attribution',
+      );
+      if (width <= 900)
+        for (const scenario of TRAY_SCENARIOS) {
+          const originalDock = toPx(
+            resolve(['#command-dock'], 'bottom', width, 'dock').decl.value,
+            height,
+            'dock',
+          );
+          assert.ok(
+            trayBottomPx(scenario, width, height) -
+              originalDock +
+              dock -
+              credit -
+              CREDIT_HEIGHT_PX >=
+              MIN_CLEARANCE_PX,
+            'PHANTOM tray covers attribution at ' + width + 'x' + height,
+          );
+        }
+      if (width <= 720) {
+        const rail = toPx(
+          resolve(
+            ['#right-context-rail', PHANTOM_RAIL],
+            'bottom',
+            width,
+            'PHANTOM rail',
+          ).decl.value,
+          height,
+          'PHANTOM rail',
+        );
+        assert.ok(
+          rail - credit - CREDIT_HEIGHT_PX >= MIN_CLEARANCE_PX,
+          'PHANTOM rail covers attribution',
+        );
+      }
+    }
 });

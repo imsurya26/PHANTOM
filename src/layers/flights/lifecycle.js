@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { PLANE_MODEL_URL } from './policy.js';
+import { syncFlightRenderDemand } from './renderDemand.js';
 
 export function createLifecycle({
   flightState,
@@ -15,7 +16,7 @@ export function createLifecycle({
     restoreSpriteOrderOnEnable,
   } = services.sprites;
   const { onMilitaryLayerActiveChange } = services.militaryRegistry;
-  const { holdContinuousRender, releaseContinuousRender } = services.render;
+  const { releaseContinuousRender } = services.render;
   const { ensureGeoidReady } = services.geoid;
   const { registerPickOwner, unregisterPickOwner } = services.picking;
 
@@ -136,7 +137,7 @@ export function createLifecycle({
     enable(viewer) {
       if (flightState._billboardCollection)
         flightState._billboardCollection.show = true;
-      holdContinuousRender('flights'); // per-frame animator (perf wave 2)
+      syncFlightRenderDemand(flightState, services.render);
       if (flightState._modelCollection)
         flightState._modelCollection.show = true;
       parts.tracking._setCockpitContactMode(

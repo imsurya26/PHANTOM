@@ -144,7 +144,7 @@ for (const preview of [false, true]) {
       JSON.parse(calls[0].options.body).locationRestriction.circle.radius,
       5000,
     );
-    assert.equal(result.headers['cache-control'], 'private, max-age=300');
+    assert.equal(result.headers['cache-control'], 'no-store');
     key = 'rotated-fixture-key';
     assert.equal(
       (await request(search, '?q=museum&lat=30&lon=-97&radiusM=1')).statusCode,
@@ -162,7 +162,7 @@ for (const preview of [false, true]) {
     );
     assert.deepEqual((await request(search, '?q=museum&lat=30&lon=-97')).body, {
       places: [],
-      error: 'Denied',
+      error: 'Google Places request failed',
     });
   });
 }

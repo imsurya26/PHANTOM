@@ -8,7 +8,8 @@ export { photorealUnavailableReason } from './maps/availability.js';
 export class MapStackController extends MapSourceController {
   constructor(viewer, options = {}) {
     const googleApiKey =
-      typeof window !== 'undefined' ? window.__GOOGLE_MAPS_API_KEY__ : '';
+      options.googleApiKey ??
+      (typeof window !== 'undefined' ? window.__GOOGLE_MAPS_API_KEY__ : '');
     const registry = createDefaultMapSources({ ...options, googleApiKey });
     super(viewer, {
       registry,

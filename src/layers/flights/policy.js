@@ -437,3 +437,12 @@ export const FLOOR_SEED_GRACE_MS = 90_000;
  *  reloads synchronously. */
 
 export const IR_RELOAD_BATCH = 40;
+/** Visible, tracked/model and cockpit contacts retain the normal fleet cadence. */
+export function fleetMotionDue(visible, nowMs, lastMs) {
+  return (
+    visible ||
+    !Number.isFinite(lastMs) ||
+    nowMs < lastMs ||
+    nowMs - lastMs >= 1000
+  );
+}

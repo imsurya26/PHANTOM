@@ -1,5 +1,7 @@
 import { createStandalonePlaceSearch } from '../standalone/placeSearch.js';
 import { createPlaceSearch } from '../search/placeSearch.js';
+import { createGoogleGeocoder } from '../search/google.js';
+import { createPhotonGeocoder } from '../keylessGeocoder.js';
 // Footprint-selection contract tests — pure fixtures, no network, no browser.
 //
 // Locks the field-test-7 monument fix (docs/field-test-rootcause-2026-06-30.md §1):
@@ -620,5 +622,13 @@ test('a not-found is remembered only when every source consulted gave a verdict'
 });
 
 function resolveAnnotationTarget(options) {
-  return resolveTarget({ placeSearch: createStandalonePlaceSearch({ resolveApiKey: () => globalThis.window?.__GOOGLE_MAPS_API_KEY__ }), ...options });
+  // Annotation contracts inject their scripted provider chain; production
+  // defaults now use keyless geocoding, covered by placeSearch tests.
+  const placeSearch = createStandalonePlaceSearch({ providers: { geocode: [
+    createGoogleGeocoder({ request(query, { signal }) {
+      return fetch(`https://maps.googleapis.com/maps/api/geocode/json?${new URLSearchParams({ address: query })}`, { signal });
+    } }),
+    createPhotonGeocoder({ fetchImpl: (...args) => fetch(...args) }),
+  ] } });
+  return resolveTarget({ placeSearch, ...options });
 }

@@ -1,3 +1,4 @@
+import { classifyCameraMedia } from '../sources/cctvMediaStatus.js';
 export function _clearCctvFrame() {
   this._cctvFrameRequestToken += 1;
   if (this._cctvFramePreloader) {
@@ -102,10 +103,8 @@ export function _syncCctvSourceBadge(activeCamera, enabled) {
     this._cctvSourceBadge.dataset.frameState = 'error';
     return;
   }
-  const kind = String(
-    activeCamera.sourceKind || activeCamera.feedType || 'unknown',
-  ).toUpperCase();
-  const status = String(activeCamera.sourceStatus || 'unknown').toUpperCase();
-  this._cctvSourceBadge.textContent = `${kind} · ${status}`;
+  this._cctvSourceBadge.textContent = classifyCameraMedia(activeCamera);
+  this._cctvSourceBadge.title =
+    'Capture time is not supplied. Status checks do not prove image freshness.';
   this._cctvSourceBadge.dataset.frameState = 'ready';
 }

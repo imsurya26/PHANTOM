@@ -49,11 +49,10 @@ export function normalizeGoogleReverse(data) {
 /** Existing JSON protocols with application-selected endpoints and transport. */
 export function createHttpGeospatialProvider({
   fetchImpl = (...args) => fetch(...args),
-  resolveApiKey,
   endpoints = {},
 } = {}) {
   const urls = {
-    reverse: 'https://maps.googleapis.com/maps/api/geocode/json',
+    reverse: null,
     textSearch: '/api/google/text-search',
     nearby: '/api/google/nearby-places',
     route: '/api/route',
@@ -88,12 +87,11 @@ export function createHttpGeospatialProvider({
     },
     routeProfiles: ['foot', 'car', 'bike'],
     async reverseGeocode(latitude, longitude, options) {
-      const key = resolveApiKey?.();
-      if (resolveApiKey && !key) return null;
+      if (!urls.reverse) return null;
       return normalizeGoogleReverse(
         await json(
           urls.reverse,
-          { latlng: `${latitude},${longitude}`, ...(key ? { key } : {}) },
+          { latlng: `${latitude},${longitude}` },
           options,
         ),
       );

@@ -215,7 +215,10 @@ test('row chips use real params; query overrides passive restore and user can ch
     assert.equal(chips[0].active, true);
     layer.setParams(chips[2].params, { origin: 'user' });
     assert.equal(layer.getParams().roadMode, 'hybrid');
-    assert.match(layer.getStats().loadingLabel, /Hybrid needs a TomTom key/);
+    assert.match(
+      layer.getStats().loadingLabel,
+      /reference roads while measured traffic is unavailable/,
+    );
     assert.equal(layer.getStats().roadMode, 'osm');
   } finally {
     if (oldLocation === undefined) delete globalThis.location;

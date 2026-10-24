@@ -1,5 +1,13 @@
 # Security
 
+## PHANTOM development status
+
+PHANTOM is not yet approved for public deployment. Its new gateway adds centralized admission and an experimental distributed, deny-by-default public profile, but does not supply owner authentication or complete every provider audit. Keep the development server bound to localhost. See [the engineering assessment](docs/PHANTOM-ENGINEERING.md) and [provider controls](docs/PHANTOM-PROVIDERS.md).
+
+The new source-context endpoints use fixed HTTPS origins, response limits, timeouts, bounded caches and source-specific cooldowns. Nexus does not fetch arbitrary URLs or invoke a model: it calculates proximity from bounded, source-timestamped local records. Neither feature establishes causality or verifies news reports.
+
+The upstream security documentation below remains relevant to retained functionality. In particular, local credential management, Codex OAuth and MCP must not be made public. The preliminary public profile denies these features rather than treating a frontend toggle or same-site header as authentication.
+
 God's Eye View is a local-first client for **public** data. It is built for exploration, demos, and learning — not as a hardened production service. This document explains the security model so you can run it safely and report issues responsibly.
 
 ## Reporting a vulnerability
@@ -21,19 +29,22 @@ The golden rule: **secret-bearing API keys stay on the server side.** The dev/pr
 | ChatGPT sign-in through Codex (optional, experimental) | Codex's own `auth.json` (`CODEX_HOME`, default `~/.codex`); GEV reads it server-side and never writes or refreshes it | Only after **USE CHATGPT OAUTH** is selected in Provider Settings: the server mints the same ephemeral Realtime token with the ChatGPT access token, for loopback clients only |
 | `AISSTREAM_API_KEY` | Server only | Server holds the AISStream websocket; browser polls the same-origin `/api/vessels` cache |
 | OpenSky OAuth (`OPENSKY_CLIENT_ID/SECRET`) | Server only | Server mints + refreshes the token behind `/api/flights` |
-| `GOOGLE_MAPS_SERVER_API_KEY` (optional, #33) | Server only | Server calls Places (`/api/google/nearby-places`, `/api/google/text-search`) and the Street View fallback with this key; falls back to `GOOGLE_MAPS_API_KEY` when unset |
+| `GOOGLE_MAPS_SERVER_API_KEY` | Server only | Places API (New) only; missing credentials disable Places without falling back to the browser key |
+| `FIRMS_MAP_KEY`, `OPENAQ_API_KEY`, `TOMTOM_API_KEY` | Server only | Same-origin bounded provider proxies |
+| `GEMINI_API_KEY` | Server only | Disabled-by-default local ephemeral-token provisioning; browser Gemini voice integration remains unfinished |
+| `MAPILLARY_CLIENT_SECRET` | Server only, unused | No OAuth flow currently requires it |
 
 ### Three deliberately client-side keys — restrict them
 
 These are designed to be used directly in the browser (like a Mapbox public token). They are injected into the client bundle via Vite's `define`, so they **will** be visible in browser devtools. Scope and restrict them rather than trying to hide them:
 
-1. **Google Maps API key** — loads Photorealistic 3D Tiles directly and powers GEV place search. **Restrict it** (HTTP referrer + API restriction to the required Google APIs) in the Google Cloud Console. An unrestricted key in a public deployment can be abused and billed to you.
+1. **Google Maps API key** — loads Google map tiles directly. It is restricted to Map Tiles API; search uses keyless providers. **Restrict it** (HTTP referrer + API restriction to the required Google APIs) in the Google Cloud Console. An unrestricted key in a public deployment can be abused and billed to you.
 2. **Cesium ion token** (`CESIUM_ION_TOKEN`, optional — for ion-hosted Google Photorealistic 3D Tiles, Bing world imagery, and world terrain) — used as `Cesium.Ion.defaultAccessToken` client-side. Use a public **`assets:read`** token with **URL restrictions** for any hosted deployment. The Community plan has eligibility and usage limits; a public token is not a secret, but it can still consume the account's quota.
 3. **Mapillary client token** (`MAPILLARY_CLIENT_TOKEN`, optional, Street Level) — used by the MapillaryJS viewer and Graph API lookups in the browser, and by the server's coverage-tile proxy. Mapillary client tokens are meant for browser use.
 
 > The explicit browser `define` block in `build/vite.js` controls exactly what reaches the client: only these three keys. Everything else stays server-side.
 
-**Places and Street View never needed to be on that list** (#33): they're called from the server-side proxies in the table above, which use `GOOGLE_MAPS_SERVER_API_KEY` when it's set. Splitting it from the browser-exposed key lets each key's Google Cloud restriction actually match what it does — the browser key referrer-restricted to the APIs the client loads, the server key IP-restricted (never a referrer, since it never leaves your server) to Places + Street View Static — instead of one key that has to be either over-permissioned or broken for one of its two jobs. A single shared `GOOGLE_MAPS_API_KEY` still works if you don't split them; it just has to cover every API both sides use.
+Google credentials are separated by API: the browser key is for Map Tiles API, and the server key is for Places API (New). Legacy Street View Static tooling requires its own optional `GOOGLE_STREETVIEW_SERVER_API_KEY`; it never reuses either key. Confirm application restrictions for the chosen deployment before production.
 
 Never commit real keys. `.env` is gitignored; only `.env.example` (placeholder names) is tracked. On macOS `dev-fresh.sh` can read keys from the Keychain; plain Vite uses env vars or a local `.env`, and Pinokio uses its ignored app `ENVIRONMENT` file.
 
@@ -56,8 +67,7 @@ only the browser key; sharing an environment file does not expose the server
 key. Provider Settings presents only the browser key as Google Maps; configure
 the optional server key manually in the environment file. Pinokio uses
 its ignored `pinokio/ENVIRONMENT` instead, with app values and blanks taking
-precedence over inherited global values. An absent server key retains the
-browser-key fallback for existing single-key setups.
+precedence over inherited global values. An absent server key disables Google Places; keyless place search remains available.
 
 ## Server-side proxy hardening
 

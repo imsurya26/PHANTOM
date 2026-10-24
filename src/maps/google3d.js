@@ -1,4 +1,14 @@
+import { safeMapError } from './diagnostics.js';
 const clean = (value) => String(value || '').trim();
+
+// Resident GPU tile cache, not an offline content cache. Keep mobile memory bounded.
+export const GOOGLE_TILE_OPTIONS = Object.freeze({
+  cacheBytes: 256 * 1024 * 1024,
+  maximumCacheOverflowBytes: 128 * 1024 * 1024,
+  enableCollision: true,
+  showCreditsOnScreen: true,
+  asynchronouslyLoadImagery: true,
+});
 
 /**
  * Decide which map provider can deliver the best startup experience.
@@ -55,7 +65,7 @@ export async function loadPhotorealisticTileset(
       const tileset = await attempt.create();
       return { tileset, route: attempt.route, errors };
     } catch (error) {
-      errors.push(error instanceof Error ? error : new Error(String(error)));
+      errors.push(safeMapError(error));
     }
   }
 
@@ -68,8 +78,8 @@ export function createGoogleDirectTileset(Cesium, key) {
   if (!key) throw new Error('Google 3D requires an explicit browser key');
   // Tiles keep drawing their own texture while draped weather loads.
   return Cesium.createGooglePhotorealistic3DTileset(
-    { key, onlyUsingWithGoogleGeocoder: true },
-    { asynchronouslyLoadImagery: true },
+    { key },
+    { ...GOOGLE_TILE_OPTIONS },
   );
 }
 
@@ -98,9 +108,7 @@ export async function createGoogleTokenTileset(Cesium, tokens) {
   });
   // The settings Cesium's Google helper applies to the key route.
   return Cesium.Cesium3DTileset.fromUrl(resource, {
-    cacheBytes: 1536 * 1024 * 1024,
-    maximumCacheOverflowBytes: 1024 * 1024 * 1024,
-    enableCollision: true,
+    ...GOOGLE_TILE_OPTIONS,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
   });
@@ -121,9 +129,7 @@ export async function createGoogleIonTileset(
   signal?.throwIfAborted();
   // Match the installed SDK's Google helper rendering/cache defaults.
   return Cesium.Cesium3DTileset.fromUrl(resource, {
-    cacheBytes: 1536 * 1024 * 1024,
-    maximumCacheOverflowBytes: 1024 * 1024 * 1024,
-    enableCollision: true,
+    ...GOOGLE_TILE_OPTIONS,
     // Tiles keep drawing their own texture while draped weather loads.
     asynchronouslyLoadImagery: true,
   });

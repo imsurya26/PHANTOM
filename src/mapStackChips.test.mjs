@@ -367,8 +367,10 @@ test("models carry the stack's own reason and never invent an active chip", () =
     [
       {
         requirement: 'ION',
-        unavailableHint: 'Needs CESIUM_ION_TOKEN — add it in Provider Settings',
-        title: 'Needs CESIUM_ION_TOKEN — add it in Provider Settings',
+        unavailableHint:
+          'This optional source is unavailable. Other map features are ready to explore.',
+        title:
+          'This optional source is unavailable. Other map features are ready to explore.',
       },
       {
         requirement: '',
@@ -527,7 +529,7 @@ test('the Visual Presets tray owns Map Source and the retired left panel is abse
   );
   assert.match(
     ui,
-    /return this\._mapSourceControls\.select\(stackId, \{ syncShare \}\)/,
+    /return this\._mapSourceControls\.select\(stackId, \{ syncShare, signal \}\)/,
     'the application action uses the component selection path',
   );
   assert.match(
@@ -537,7 +539,7 @@ test('the Visual Presets tray owns Map Source and the retired left panel is abse
   );
   assert.match(
     controls,
-    /await controller\.setStack\(stackId\)/,
+    /await controller\.setStack\(stackId, \{ signal \}\)/,
     'selection still delegates source loading to the map controller',
   );
   assert.match(

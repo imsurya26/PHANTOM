@@ -4,6 +4,7 @@ import {
 } from './google-key.js';
 import { makeCostRateLimiter, clientKey } from '../common/rate-limit.js';
 import { admitSameSite } from '../common/same-site.js';
+import { readResponseJsonCapped } from '../common/http.js';
 import {
   projectNearbyPlaces,
   projectTextSearchPlaces,
@@ -62,6 +63,61 @@ export function googlePlacesContextProxy({
   fetchImpl = (...args) => fetch(...args),
   endpoints = {},
 } = {}) {
+  const inflight = new Map();
+  let cooldownUntil = 0;
+  let windowAt = Date.now();
+  let attempts = 0;
+  async function requestPlaces(url, options) {
+    const key = `${url}:${options.body}`;
+    if (inflight.has(key)) return inflight.get(key);
+    const now = Date.now();
+    if (now - windowAt >= 60_000) {
+      windowAt = now;
+      attempts = 0;
+    }
+    if (attempts >= 60) return { ok: false, status: 429, data: {} };
+    if (now < cooldownUntil || inflight.size >= 4)
+      throw new Error('Google Places temporarily unavailable');
+    attempts++;
+    const pending = Promise.resolve().then(async () => {
+      const signal = AbortSignal.timeout(8000);
+      try {
+        const response = await fetchImpl(url, {
+          ...options,
+          signal,
+          redirect: 'error',
+        });
+        if (!response.ok) {
+          void response.body?.cancel().catch(() => {});
+          cooldownUntil = Math.max(
+            cooldownUntil,
+            Date.now() +
+              (response.status === 429 ||
+              response.status === 401 ||
+              response.status === 403
+                ? 300_000
+                : 30_000),
+          );
+          return { ok: false, status: response.status, data: {} };
+        }
+        const data = await readResponseJsonCapped(response, 512 * 1024, signal);
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          (data.places !== undefined && !Array.isArray(data.places))
+        )
+          throw new Error('Invalid Places response');
+        return { ok: true, status: 200, data };
+      } catch {
+        cooldownUntil = Math.max(cooldownUntil, Date.now() + 30_000);
+        throw new Error('Google Places temporarily unavailable');
+      } finally {
+        inflight.delete(key);
+      }
+    });
+    inflight.set(key, pending);
+    return pending;
+  }
   function install(middlewares) {
     middlewares.use('/api/google/nearby-places', async (req, res) => {
       // Gate first, like the OpenAI routes: a cross-site caller learns nothing
@@ -115,7 +171,7 @@ export function googlePlacesContextProxy({
       );
 
       try {
-        const response = await fetchImpl(
+        const response = await requestPlaces(
           endpoints.nearby ||
             'https://places.googleapis.com/v1/places:searchNearby',
           {
@@ -147,18 +203,17 @@ export function googlePlacesContextProxy({
             }),
           },
         );
-        const data = await response.json().catch(() => ({}));
+        const data = response.data;
         const places = projectNearbyPlaces(data, latitude, longitude);
 
         res.statusCode = response.ok ? 200 : response.status;
+        if (response.status === 429) res.setHeader('Retry-After', '60');
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.setHeader('Cache-Control', 'no-store');
         res.end(
           JSON.stringify({
             places,
-            error: response.ok
-              ? null
-              : data.error?.message || 'Google Places request failed',
+            error: response.ok ? null : 'Google Places request failed',
           }),
         );
       } catch (error) {
@@ -166,7 +221,7 @@ export function googlePlacesContextProxy({
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(
           JSON.stringify({
-            error: error?.message || 'Google Places request failed',
+            error: 'Google Places request failed',
             places: [],
           }),
         );
@@ -202,7 +257,7 @@ export function googlePlacesContextProxy({
 
       const requestUrl = new URL(req.url || '', 'http://localhost');
       const textQuery = String(requestUrl.searchParams.get('q') || '').trim();
-      if (!textQuery) {
+      if (!textQuery || textQuery.length > 200) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
         res.end(
@@ -237,7 +292,7 @@ export function googlePlacesContextProxy({
       );
 
       try {
-        const response = await fetchImpl(
+        const response = await requestPlaces(
           endpoints.textSearch ||
             'https://places.googleapis.com/v1/places:searchText',
           {
@@ -268,18 +323,17 @@ export function googlePlacesContextProxy({
             }),
           },
         );
-        const data = await response.json().catch(() => ({}));
+        const data = response.data;
         const places = projectTextSearchPlaces(data, latitude, longitude);
 
         res.statusCode = response.ok ? 200 : response.status;
+        if (response.status === 429) res.setHeader('Retry-After', '60');
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.setHeader('Cache-Control', 'no-store');
         res.end(
           JSON.stringify({
             places,
-            error: response.ok
-              ? null
-              : data.error?.message || 'Google Places request failed',
+            error: response.ok ? null : 'Google Places request failed',
           }),
         );
       } catch (error) {
@@ -287,7 +341,7 @@ export function googlePlacesContextProxy({
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.end(
           JSON.stringify({
-            error: error?.message || 'Google Places request failed',
+            error: 'Google Places request failed',
             places: [],
           }),
         );

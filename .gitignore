@@ -17,6 +17,7 @@ output/
 # Browser QA gate evidence (screenshots, console and network dumps).
 qa-artifacts/
 .DS_Store
+.vercel/
 .gstack/
 3d-models/
 pinokio/ENVIRONMENT

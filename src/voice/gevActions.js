@@ -1110,7 +1110,13 @@ export function createGevActionRunner({
       const stackId = normalizeStackId(args.stack);
       if (!stackId)
         throw new Error(`Unknown map stack: ${args.stack || 'missing'}`);
-      const result = await styleManager.setMapStack(stackId);
+      if (!current())
+        return { ok: false, cancelled: true, action: 'set_map_stack' };
+      const result = await styleManager.setMapStack(stackId, {
+        signal: runOptions.signal,
+      });
+      if (!current())
+        return { ok: false, cancelled: true, action: 'set_map_stack' };
       return { action: 'set_map_stack', requested: stackId, ...result };
     }
 

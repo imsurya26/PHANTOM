@@ -681,6 +681,9 @@ function failingMapController() {
     },
   };
   const registry = createDefaultMapSources({ googleTileset: { show: true } });
+  // Exercise custom-source recovery to a 3D host. PHANTOM's default recovery
+  // is now the free globe; this test protects the generic lease contract.
+  registry.recoveryId = 'photoreal';
   for (const source of registry.sources) {
     if (!source.imagery) continue;
     const id = source.descriptor.id;

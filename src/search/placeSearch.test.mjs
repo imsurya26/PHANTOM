@@ -16,17 +16,22 @@ test('malformed successful Photon responses remain retryable', async () => {
   }
 });
 
-test('standalone geocoding falls back after Google connection, JSON and refusal failures', async () => {
-  for (const fail of [() => { throw new Error('offline'); }, () => new Response('invalid json'), () => Response.json({ status: 'REQUEST_DENIED' })]) {
-    const urls = [];
-    const service = createStandalonePlaceSearch({ resolveApiKey: () => 'fixture', fetchImpl: async (url) => {
-      urls.push(url); return url.includes('maps.googleapis.com') ? fail() : hit();
-    } });
-    const result = await service.geocode('Hanoi');
-    assert.equal(result.place.name, 'Hà Nội');
-    assert.equal(result.fallbackUsed, true);
-    assert.equal(urls.length, 2);
-  }
+test('standalone search never uses the browser Map Tiles credential for geocoding', async () => {
+  const urls = [];
+  const service = createStandalonePlaceSearch({
+    resolveApiKey: () => {
+      throw new Error('Browser map credential must not be read');
+    },
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return hit();
+    },
+  });
+  assert.equal((await service.geocode('Hanoi')).place.name, 'Hà Nội');
+  assert.equal(urls.length, 1);
+  assert.equal(new URL(urls[0]).hostname, 'photon.komoot.io');
+  assert.equal(await service.reverseGeocode(21.03, 105.85), null);
+  assert.equal(urls.length, 1);
 });
 
 test('a keyless service does not issue any Google request', async () => {

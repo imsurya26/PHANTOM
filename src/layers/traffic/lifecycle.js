@@ -81,13 +81,14 @@ export function createLifecycle({
       layerState._enabled = true;
       layerState._surfaceFrameRemover = observeTrafficSurface(viewer.scene);
       if (layerState._roadMode !== 'tomtom') source.prefetch?.();
-      holdContinuousRender('traffic'); // per-frame animator (perf wave 2)
+      if (!layerState._operationalRoads) holdContinuousRender('traffic');
       layerState._lastAnimTime = 0;
       layerState._pointCollection.show = true;
 
-      layerState._preRenderRemover = viewer.scene.preRender.addEventListener(
-        parts.animation.animate,
-      );
+      if (!layerState._operationalRoads)
+        layerState._preRenderRemover = viewer.scene.preRender.addEventListener(
+          parts.animation.animate,
+        );
       if (TRAFFIC_TIMING_ENABLED) {
         parts.timing.clearTrafficTimingEntries();
         layerState._trafficTimingCurrentAnchor = null;

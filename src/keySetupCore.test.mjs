@@ -15,10 +15,10 @@ import {
   validateKeySetupUpdates,
 } from './keySetupCore.mjs';
 
-test('provider requirements name the registry env vars and next step', () => {
+test('ordinary provider requirements explain availability without credential jargon', () => {
   assert.equal(
     keySetupRequirement('cesium-ion'),
-    'Needs CESIUM_ION_TOKEN — add it in Provider Settings',
+    'This optional source is unavailable. Other map features are ready to explore.',
   );
   assert.equal(keySetupRequirement('unknown'), '');
 });

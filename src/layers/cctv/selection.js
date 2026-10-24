@@ -81,6 +81,8 @@ export function createSelection({
     ) {
       return CCTV_ACTIVATION_RESULT.UNCHANGED;
     }
+    if (layerState._activeCameraId !== cameraId)
+      parts.projection.setMediaWatching(false, { notify: false });
     layerState._activeCameraId = cameraId;
     layerState._autoHopSuspended = false;
     // A real activation creates projection work — wake the self-stopping loop.
@@ -162,6 +164,7 @@ export function createSelection({
       ? layerState._recordById.get(layerState._activeCameraId)
       : null;
     if (!record) return false;
+    parts.projection.setMediaWatching(false, { notify: false });
     layerState._activeCameraId = null;
     layerState._autoHopSuspended = true;
     record.activationDone = false;

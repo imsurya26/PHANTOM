@@ -531,8 +531,9 @@ export class LayerPanel {
     if (layer.lifecycleUncertain) {
       return `UNCERTAIN · ${source} · lifecycle state requires reconciliation`;
     }
-    const presentedError =
-      stats.error || stats.lastError || stats.managerRefreshError;
+    const presentedError = stats.keyRequired
+      ? 'This optional source is currently unavailable'
+      : stats.error || stats.lastError || stats.managerRefreshError;
     if (presentedError) {
       if (typeof stats.retryInSec === 'number' && stats.retryInSec > 0) {
         return `${stateLabel} · ${source} · ${presentedError} · retry ${stats.retryInSec}s`;
@@ -630,9 +631,11 @@ export class LayerPanel {
         : layer.enabled || unavailable
           ? FEED_STATE_LABELS[feedState]
           : 'OFF';
-    const keyGuidance = unavailable
-      ? String(layer.stats.error || 'Data source unavailable')
-      : layerKeyRequirementTooltip(layer);
+    const keyGuidance = layer.stats?.keyRequired
+      ? layerKeyRequirementTooltip(layer)
+      : unavailable
+        ? String(layer.stats.error || 'Data source unavailable')
+        : layerKeyRequirementTooltip(layer);
     // Name the missing key on the control itself: a row reading KEY REQUIRED
     // without saying WHICH key leaves a dead control and no next step. Empty
     // when the layer needs no key, or already has one.

@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { sphereIntersectsFrustum } from './sphereVisibility.js';
 import { cyberSonarBaseAlpha } from '../../cyberSonar.js';
 import { selectModelEligible } from '../../data/modelEligibility.js';
 import { civilAircraftModelSpec } from './modelSpec.js';
@@ -33,6 +34,7 @@ import {
   COURSE_SLEW_DT_MAX_SEC,
   ROTATION_REFRESH_MS,
   COURSE_MAX_DPS,
+  fleetMotionDue,
 } from './policy.js';
 
 export function createRendering({
@@ -42,6 +44,9 @@ export function createRendering({
   layer,
   resolveAsset,
 }) {
+  const offscreenMotionTimes = new WeakMap();
+  const fleetNow = new Cesium.JulianDate();
+  let offscreenPhase = 0;
   const { isMilitaryIcao } = services.militaryRegistry;
   const { tr3bIconKind, isTr3b } = services.aircraftPresentation;
   const { trackedModelScaleForPixelCap } = services.camera;
@@ -850,6 +855,12 @@ export function createRendering({
 
     const occluder = horizonOccluder(camera);
     const focusTarget = getFocusTarget();
+    const fleetCull = camera.frustum.computeCullingVolume(
+      camera.positionWC,
+      camera.directionWC,
+      camera.upWC,
+    );
+    Cesium.JulianDate.now(fleetNow);
 
     // 3D model regime: only when enabled AND the camera is zoomed in past the altitude ceiling.
     // Drop all models the moment we leave it (toggled off / zoomed out) so billboards resume.
@@ -935,8 +946,35 @@ export function createRendering({
       if (icao24 === flightState._trackedIcao) continue; // tracked entity owns its own motion
 
       const info = flightState.records.data.get(icao24);
-
-      const dr = parts.motion._deadReckon(icao24, flightState._scratchFleetPos);
+      // Keep offscreen motion current at 1 Hz without spending the full fleet
+      // presentation budget on thousands of contacts outside the viewport.
+      // The generous sphere covers motion between updates and edge glyphs.
+      const inView = sphereIntersectsFrustum(fleetCull, bb.position, 2000);
+      const protectedContact =
+        flightState._cockpitContactMode ||
+        modelEligible?.has(icao24) ||
+        flightState._models.has(icao24);
+      if (
+        !fleetMotionDue(
+          inView || protectedContact,
+          nowMs,
+          offscreenMotionTimes.get(bb),
+        )
+      )
+        continue;
+      // Spread the first offscreen refresh across ten slots; a global snapshot
+      // must not turn into another synchronized ten-thousand-contact spike.
+      offscreenMotionTimes.set(
+        bb,
+        !inView && !offscreenMotionTimes.has(bb)
+          ? nowMs - (offscreenPhase++ % 10) * 100
+          : nowMs,
+      );
+      const dr = parts.motion._deadReckon(
+        icao24,
+        flightState._scratchFleetPos,
+        fleetNow,
+      );
       // The dead-reckoned point drifts away from the fix whose cell supplied the
       // height, so a grounded contact's sprite ends up under the mesh it taxied
       // (or coasted) over. Re-floor at the DISPLAYED coordinate — read-only, and
@@ -979,6 +1017,7 @@ export function createRendering({
         if (m && m.show) m.show = false;
         continue;
       }
+      if (!inView && !protectedContact) continue;
 
       // One order-independent write site composes freshness × focus × limb haze
       // for alpha, and base class/ground scale × limb taper for scale. Cesium's

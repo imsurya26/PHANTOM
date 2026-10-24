@@ -1,5 +1,8 @@
 import * as Cesium from 'cesium';
-import { FIRMS_OVERLAY_SOURCE_ID } from '../../data/firmsLabels.js';
+import {
+  FIRMS_OVERLAY_SOURCE_ID,
+  fireDetectionKey,
+} from '../../data/firmsLabels.js';
 import { horizonOccluder } from '../../data/iconOrientation.js';
 import { LOD_LEVELS, CONTEXT_TOP_N } from './policy.js';
 
@@ -13,9 +16,27 @@ export function createRendering({
   const { warmFireAnchorFloors } = services.anchors;
   const { registerSpriteCollection, restoreSpriteOrder } = services.sprites;
   const { overlayHost } = config;
+  const detectionSprites = new Map();
+  const cellEntities = new Map();
+
+  function reconcileCells(wanted) {
+    for (const [key, entity] of cellEntities) {
+      if (wanted.has(key)) continue;
+      layerState._dataSource?.entities.remove(entity);
+      cellEntities.delete(key);
+    }
+  }
+
+  function reconcileDetections(wanted) {
+    for (const [key, sprite] of detectionSprites) {
+      if (wanted.has(key)) continue;
+      layerState._billboards?.remove(sprite);
+      detectionSprites.delete(key);
+    }
+  }
 
   /**
-   * Rebuild the render for the current LOD band and viewport. Skips work
+   * Reconcile the render for the current LOD band and viewport. Skips work
    * when neither the (hysteresis-damped) LOD band nor the padded view
    * rectangle changed meaningfully.
    * @param {boolean} force - Rebuild even if LOD/view appear unchanged.
@@ -25,12 +46,18 @@ export function createRendering({
    */
 
   function renderCurrentLod(force = false) {
-    if (
-      !layerState._dataSource ||
-      !layerState._fires.length ||
-      !layerState._viewer
-    )
-      return false;
+    if (!layerState._dataSource || !layerState._viewer) return false;
+    if (!layerState._fires.length) {
+      reconcileCells(new Set());
+      reconcileDetections(new Set());
+      layerState._pickIndexById.clear();
+      layerState._cullPositions.length = 0;
+      layerState._cellCount = 0;
+      layerState._labelCandidates = [];
+      components.cards.rebuildAmbientLabels();
+      components.selection.refreshContextRegistrations([]);
+      return true;
+    }
     const lodIndex = components.viewport.selectLodIndex(
       components.viewport.cameraHeight(),
     );
@@ -130,8 +157,11 @@ export function createRendering({
 
   function renderCells(cells, lod, bounds) {
     ensureDetectionCollections();
-    layerState._dataSource.entities.removeAll();
-    if (layerState._billboards) layerState._billboards.removeAll();
+    reconcileDetections(new Set());
+    const wanted = new Set(
+      cells.map((cell) => `${lod.gridDegrees}:${cell.latCell}:${cell.lonCell}`),
+    );
+    reconcileCells(wanted);
     layerState._pickIndexById.clear();
     layerState._cullPositions.length = 0;
     layerState._cellCount = cells.length;
@@ -149,25 +179,39 @@ export function createRendering({
       const centerLat = cell.latCell + lod.gridDegrees / 2;
       const position = Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0);
 
-      layerState._dataSource.entities.add({
-        rectangle: {
-          coordinates: Cesium.Rectangle.fromDegrees(
-            cell.lonCell,
-            cell.latCell,
-            cell.lonCell + lod.gridDegrees,
-            cell.latCell + lod.gridDegrees,
-          ),
-          material: new Cesium.ColorMaterialProperty(color),
-          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-        },
-        position,
-        properties: {
-          count: cell.count,
-          intensity: score,
-          maxFrp: cell.maxFrp,
-          night: cell.night,
-        },
-      });
+      const key = `${lod.gridDegrees}:${cell.latCell}:${cell.lonCell}`;
+      const existing = cellEntities.get(key);
+      if (existing) {
+        existing.rectangle.material.color = color;
+        // Preserve the PropertyBag as well as the ground geometry. Constant
+        // property setters suppress notifications when the value is unchanged.
+        existing.properties.count = cell.count;
+        existing.properties.intensity = score;
+        existing.properties.maxFrp = cell.maxFrp;
+        existing.properties.night = cell.night;
+      } else {
+        const entity = layerState._dataSource.entities.add({
+          id: `firms-cell:${key}`,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(
+              cell.lonCell,
+              cell.latCell,
+              cell.lonCell + lod.gridDegrees,
+              cell.latCell + lod.gridDegrees,
+            ),
+            material: new Cesium.ColorMaterialProperty(color),
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          },
+          position,
+          properties: {
+            count: cell.count,
+            intensity: score,
+            maxFrp: cell.maxFrp,
+            night: cell.night,
+          },
+        });
+        cellEntities.set(key, entity);
+      }
 
       // Cells arrive heat-sorted, so candidate order doubles as label priority.
       // Accent is resolved here because `normalized` only exists in this walk.
@@ -203,9 +247,8 @@ export function createRendering({
 
   function renderDetections(lod, bounds) {
     ensureDetectionCollections();
-    layerState._dataSource.entities.removeAll();
+    reconcileCells(new Set());
     if (!layerState._billboards) return;
-    layerState._billboards.removeAll();
     layerState._pickIndexById.clear();
     layerState._cullPositions.length = 0;
 
@@ -229,6 +272,8 @@ export function createRendering({
     layerState._cellCount = candidates.length;
     layerState._labelCandidates = [];
     layerState._labelLodDistance = lod.labelDistance;
+    reconcileDetections(new Set(candidates.map(fireDetectionKey)));
+    const cullBySprite = new Map();
 
     for (const fire of candidates) {
       const coreSize = components.model.frpPixelSize(fire.frp);
@@ -236,18 +281,28 @@ export function createRendering({
       const cullPosition = components.model.fireCullPosition(fire);
       const pickId = `firms-${fire.index}`;
       layerState._pickIndexById.set(pickId, fire);
-      layerState._cullPositions.push(cullPosition);
-      layerState._billboards.add({
-        id: pickId,
-        position,
-        image: components.model.glowSprite(
-          components.model.detectionColorStop(fire),
-          components.model.sizeBucket(coreSize),
-        ),
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      });
+      const key = fireDetectionKey(fire);
+      const image = components.model.glowSprite(
+        components.model.detectionColorStop(fire),
+        components.model.sizeBucket(coreSize),
+      );
+      let sprite = detectionSprites.get(key);
+      if (sprite) {
+        sprite.id = pickId;
+        sprite.position = position;
+        sprite.image = image;
+      } else {
+        sprite = layerState._billboards.add({
+          id: pickId,
+          position,
+          image,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        });
+        detectionSprites.set(key, sprite);
+      }
+      cullBySprite.set(sprite, cullPosition);
       // FRP-sorted walk: candidate order doubles as label priority.
       layerState._labelCandidates.push({
         position,
@@ -255,6 +310,13 @@ export function createRendering({
         fire,
         cell: null,
       });
+    }
+    // Cesium compacts removals in collection order, which can differ from the
+    // latest FRP ranking. Align lifted horizon anchors with retained sprites.
+    for (let i = 0; i < layerState._billboards.length; i += 1) {
+      layerState._cullPositions.push(
+        cullBySprite.get(layerState._billboards.get(i)),
+      );
     }
 
     // Freshly-added sprites default to show=true; cull the far side now so a
@@ -305,6 +367,8 @@ export function createRendering({
       }
     }
     layerState._billboards = null;
+    detectionSprites.clear();
+    cellEntities.clear();
     overlayHost.clearSource(FIRMS_OVERLAY_SOURCE_ID);
     overlayHost.setVisible(FIRMS_OVERLAY_SOURCE_ID, false);
   }

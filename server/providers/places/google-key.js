@@ -14,12 +14,8 @@ export function keylessGooglePlacesResponse(apiKey) {
 }
 
 /**
- * Google API key for the SERVER-SIDE calls (Places nearby/text search, the
- * CCTV Street View fallback). These never reach the browser, so this key can
- * be restricted by server IP and scoped to Places API + Street View Static
- * API — while GOOGLE_MAPS_API_KEY stays referrer-restricted to Map Tiles +
- * Geocoding for the browser (#33). Splitting them is opt-in: unset, this
- * falls back to the shared browser key and nothing changes.
+ * Server-only Places API (New) credential. Never substitute the browser's
+ * Map Tiles-only key or reuse this credential for Street View Static.
  */
 export function googleServerApiKey() {
   return resolveGoogleServerKey(process.env);

@@ -32,15 +32,15 @@ export function createMapSourceControls({
       statusElement.classList.toggle('warn', !!state.lastError);
     }
   }
-  async function select(stackId, { syncShare = true } = {}) {
-    if (destroyed) return null;
+  async function select(stackId, { syncShare = true, signal } = {}) {
+    if (destroyed || signal?.aborted) return null;
     const current = ++generation;
     if (syncShare) claimSelection();
     const before = controller.getActiveId();
     render(controller.getState('switching'));
     let state;
     try {
-      state = await controller.setStack(stackId);
+      state = await controller.setStack(stackId, { signal });
     } catch (error) {
       if (!destroyed && current === generation) {
         render(controller.getState());
@@ -48,7 +48,7 @@ export function createMapSourceControls({
       }
       throw error;
     }
-    if (destroyed || current !== generation) return state;
+    if (destroyed || current !== generation || signal?.aborted) return state;
     render(controller.getState());
     if (state?.activeId === before && stackId !== before && state?.lastError)
       onError(state.lastError);

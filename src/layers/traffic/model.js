@@ -242,6 +242,19 @@ export function createModel({ state: layerState, services, parts, source }) {
     statusUnavailable = false,
     roadSource = 'OpenStreetMap',
   } = {}) {
+    if (layerState._operationalRoads) {
+      const measured = liveMode && !flowError && coveragePct > 0;
+      return {
+        mode: measured ? 'live' : 'reference',
+        fallback: !measured,
+        error: null,
+        loadingLabel: fetching
+          ? 'Loading road conditions'
+          : measured
+            ? `LIVE TRAFFIC FLOW · ${coveragePct}% measured roads · no individual vehicle locations`
+            : 'TRAFFIC REFERENCE · road geometry only; live flow unavailable',
+      };
+    }
     // `mode` is the CONFIGURED source (live key present vs keyless), not this
     // instant's health — health rides on `error`. The qa-traffic harness pins
     // that meaning.
@@ -307,6 +320,15 @@ export function createModel({ state: layerState, services, parts, source }) {
    */
 
   function recolorDotsInPlace(label) {
+    if (layerState._operationalRoads) {
+      parts.rendering.rebuildHeatLines(
+        parts.rendering.visibleRoadsForAltitude(
+          layerState._roads,
+          layerState._lastRenderAltitude || 0,
+        ),
+      );
+      return;
+    }
     if (!layerState._liveMode || !layerState._dots.length) return;
     layerState._bucketCounts = { free: 0, slow: 0, jam: 0, sim: 0 };
     let closedDots = 0;

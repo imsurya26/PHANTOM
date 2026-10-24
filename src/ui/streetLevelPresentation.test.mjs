@@ -78,7 +78,7 @@ function deepMerge(target, source) {
 test('a key-gated layer disables every control and flags KEY REQUIRED', () => {
   const view = presentStreetLevelPanel(snapshot({ keyRequired: true }));
   assert.equal(view.controlsDisabled, true);
-  assert.equal(view.status.text, 'KEY REQUIRED');
+  assert.equal(view.status.text, 'UNAVAILABLE');
   assert.equal(view.status.tone, 'warn');
 });
 
@@ -91,10 +91,10 @@ test('KEY REQUIRED shows no raw error code under the pill', () => {
       providers: [provider({ keyRequired: true, error: 'no_key' })],
     }),
   );
-  assert.equal(view.status.text, 'KEY REQUIRED');
+  assert.equal(view.status.text, 'UNAVAILABLE');
   assert.equal(view.error, null);
   // The chip still says how to add the key.
-  assert.match(view.providers[0].title, /^Mapillary: Needs /);
+  assert.match(view.providers[0].title, /^Mapillary: This optional source/);
 });
 
 test('a key Mapillary rejected reads KEY REJECTED and names the fix', () => {
@@ -109,12 +109,18 @@ test('a key Mapillary rejected reads KEY REJECTED and names the fix', () => {
       providers: [provider({ keyRequired: true, keyRejected: true, error })],
     }),
   );
-  assert.equal(view.status.text, 'KEY REJECTED');
+  assert.equal(view.status.text, 'UNAVAILABLE');
   assert.equal(view.status.tone, 'warn');
   assert.equal(view.controlsDisabled, true);
-  assert.equal(view.error, error);
+  assert.equal(
+    view.error,
+    'Street imagery is temporarily unavailable. Other map features remain available.',
+  );
   assert.equal(view.providers[0].state, 'error');
-  assert.equal(view.providers[0].title, `Mapillary: ${error}`);
+  assert.equal(
+    view.providers[0].title,
+    'Mapillary: Street imagery is temporarily unavailable. Other map features remain available.',
+  );
 });
 
 test('a key problem outranks loading on the pill: KEY REJECTED, then KEY REQUIRED (M65)', () => {
@@ -124,13 +130,13 @@ test('a key problem outranks loading on the pill: KEY REJECTED, then KEY REQUIRE
   assert.equal(
     presentStreetLevelPanel(snapshot({ ...loading, keyRequired: true })).status
       .text,
-    'KEY REQUIRED',
+    'UNAVAILABLE',
   );
   assert.equal(
     presentStreetLevelPanel(
       snapshot({ ...loading, keyRequired: true, keyRejected: true }),
     ).status.text,
-    'KEY REJECTED',
+    'UNAVAILABLE',
   );
 });
 
@@ -207,7 +213,7 @@ test('one chip per provider: on, off, loading, and keyless as an error chip', ()
   assert.equal(view.providers[1].title, 'Panoramax imagery off');
   assert.match(
     view.providers[3].title,
-    /^Google Street View: Needs GOOGLE_MAPS_API_KEY/,
+    /^Google Street View: This optional source/,
   );
   assert.ok(view.providers.every((chip) => chip.disabled === false));
 });

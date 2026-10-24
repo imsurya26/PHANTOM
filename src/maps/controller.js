@@ -2,12 +2,14 @@ import { indexMapSources } from './registry.js';
 import * as Cesium from 'cesium';
 import { createMapCredits } from './credits.js';
 import { acquireImageryComparison } from './imageryComparison.js';
+import { classifyMapFailure } from './diagnostics.js';
 
 /**
  * Private `setStack` option marking a switch the controller issues itself
  * (a tile-failure fallback); outside callers cannot forge it.
  */
 const AUTOMATIC = Symbol('automatic switch');
+const FALLBACK_MESSAGE = Symbol('fallback message');
 
 /** Coordinate source lifetimes and scene changes; the registry owns provider choices. */
 export class MapSourceController {
@@ -47,6 +49,8 @@ export class MapSourceController {
     this._imageryLayer = null;
     this._activeImageryProvider = null;
     this._removeImageryErrorListener = null;
+    this._removeTilesetListeners = null;
+    this._diagnostics = new Map();
     this._terrainMode = null;
     this._subscribers = new Set();
     this._destroyed = false;
@@ -63,6 +67,11 @@ export class MapSourceController {
         ...stack,
         available,
         unavailableReason: available ? null : this._unavailableReason(stack),
+        diagnostic: this._diagnostics.get(stack.id) ||
+          this._sources.get(stack.id).diagnostic || {
+            code: 'NOT_VERIFIED',
+            httpStatus: null,
+          },
       };
     });
   }
@@ -145,7 +154,7 @@ export class MapSourceController {
       try {
         listener(state);
       } catch (error) {
-        console.warn('[MapSourceController] subscriber failed:', error);
+        console.warn('[MapSourceController] subscriber failed');
       }
     }
   }
@@ -160,8 +169,16 @@ export class MapSourceController {
     return acquireImageryComparison(this, options);
   }
 
-  async setStack(id, { silent = false, [AUTOMATIC]: automatic = false } = {}) {
-    if (this._destroyed) return this.getState();
+  async setStack(
+    id,
+    {
+      silent = false,
+      signal,
+      [AUTOMATIC]: automatic = false,
+      [FALLBACK_MESSAGE]: fallbackMessage = null,
+    } = {},
+  ) {
+    if (this._destroyed || signal?.aborted) return this.getState();
     const stack = this.getStack(id) || this.getStack(this._registry.unknownId);
     if (!stack) return null;
     if (!this.isStackAvailable(stack.id)) {
@@ -174,21 +191,29 @@ export class MapSourceController {
     this._switchOrigin = automatic ? 'automatic' : 'manual';
     this._isSwitching = true;
     this._lastError = null;
+    const cancel = () => {
+      if (this._destroyed || gen !== this._switchGen) return;
+      // Supersede only this request; a newer manual choice owns its own generation.
+      // Reapply the visible source to restore its generation-bound failure listeners.
+      void this.setStack(this._activeId, { silent: true });
+    };
+    signal?.addEventListener('abort', cancel, { once: true });
     if (!silent) this._emitChange('switching');
     try {
       const activation = await this._activate(stack, gen);
       if (gen !== this._switchGen) return this.getState();
       this._activeId = activation?.effectiveStackId || stack.id;
       if (this._activeId !== stack.id) this._switchOrigin = 'automatic';
-      if (activation?.fallbackMessage) {
-        this._lastError = activation.fallbackMessage;
-        this._onError?.(activation.fallbackMessage, stack);
+      if (activation?.fallbackMessage || fallbackMessage) {
+        this._lastError = activation?.fallbackMessage || fallbackMessage;
+        this._onError?.(this._lastError, stack);
       }
       this._requestRender('map-stack');
       if (!silent) this._emitChange('ready');
     } catch (error) {
       if (gen !== this._switchGen) return this.getState();
-      const message = error?.message || String(error);
+      this._diagnostics.set(stack.id, classifyMapFailure(error));
+      const message = `${stack.label || 'Map imagery'} is temporarily unavailable. Try another map style.`;
       this._lastError = message;
       this._onError?.(message, stack);
       const recovery = this.getStack(this._registry.recoveryId);
@@ -203,14 +228,21 @@ export class MapSourceController {
           const activation = await this._activate(recovery, gen);
           if (gen !== this._switchGen) return this.getState();
           this._activeId = activation?.effectiveStackId || recovery.id;
+          this._lastError = `${stack.label || 'Map imagery'} is temporarily unavailable. PHANTOM switched to the standard globe.`;
+          this._onError?.(this._lastError, stack);
         } catch (recoveryError) {
           if (gen !== this._switchGen) return this.getState();
-          this._lastError = recoveryError?.message || String(recoveryError);
+          this._diagnostics.set(recovery.id, classifyMapFailure(recoveryError));
+          this._lastError =
+            'Map imagery is temporarily unavailable. The globe remains available.';
           this._onError?.(this._lastError, recovery);
+          this._showTileset(null);
+          this.viewer.scene.globe.show = true;
         }
       }
       if (!silent) this._emitChange('error');
     } finally {
+      signal?.removeEventListener('abort', cancel);
       if (gen === this._switchGen) {
         this._isSwitching = false;
         // The active id has settled for this generation (activated, fell
@@ -246,15 +278,69 @@ export class MapSourceController {
     this._removeImageryLayer();
     this._credits.show(source.credit || null);
     this._showTileset(tileset);
+    this._diagnostics.set(source.descriptor.id, {
+      code: 'ROOT_LOADED',
+      httpStatus: null,
+    });
+    this._watchTileset(source, tileset, gen);
     this.viewer.scene.globe.show = false;
     // Terrain is intentionally untouched while the globe is hidden.
   }
 
   _showTileset(active) {
+    this._removeTilesetListeners?.();
+    this._removeTilesetListeners = null;
     for (const source of this._sources.values())
       if (source.tileset) source.tileset.show = source.tileset === active;
     for (const tileset of this._ownedTilesets)
       tileset.show = tileset === active;
+  }
+
+  _watchTileset(source, tileset, gen) {
+    const fallback = source.tileFailureFallback;
+    if (!fallback || !tileset.tileFailed?.addEventListener) return;
+    let failures = 0;
+    let pending = false;
+    const removeLoaded = tileset.tileLoad?.addEventListener(() => {
+      failures = 0;
+      this._diagnostics.set(source.descriptor.id, {
+        code: 'TILES_LOADED',
+        httpStatus: null,
+      });
+    });
+    const removeFailed = tileset.tileFailed.addEventListener((error) => {
+      if (
+        this._destroyed ||
+        gen !== this._switchGen ||
+        !tileset.show ||
+        pending
+      )
+        return;
+      this._diagnostics.set(source.descriptor.id, classifyMapFailure(error));
+      // Cesium tileFailed does not always retain HTTP status; do not parse its URL/message.
+      if (++failures < fallback.threshold) return;
+      pending = true;
+      const expectedGen = this._switchGen + 1;
+      void this.setStack(fallback.id, {
+        silent: true,
+        [AUTOMATIC]: true,
+        [FALLBACK_MESSAGE]: fallback.message,
+      }).then((state) => {
+        if (
+          this._destroyed ||
+          this._switchGen !== expectedGen ||
+          state?.activeId !== fallback.id
+        )
+          return;
+        this._lastError = fallback.message;
+        this._onError?.(fallback.message, source.descriptor);
+        this._emitChange('error');
+      });
+    });
+    this._removeTilesetListeners = () => {
+      removeLoaded?.();
+      removeFailed?.();
+    };
   }
 
   async _activateGlobeStack(stack, gen) {
@@ -361,7 +447,11 @@ export class MapSourceController {
         this.getStack(resolution.effectiveStackId),
       );
       const expectedGen = this._switchGen + 1;
-      void this.setStack(fallback.id, { silent: true, [AUTOMATIC]: true })
+      void this.setStack(fallback.id, {
+        silent: true,
+        [AUTOMATIC]: true,
+        [FALLBACK_MESSAGE]: fallback.message,
+      })
         .then((state) => {
           if (
             !this._destroyed &&
@@ -400,6 +490,8 @@ export class MapSourceController {
     this._abort.abort();
     this._isSwitching = false;
     this._removeImageryLayer();
+    this._removeTilesetListeners?.();
+    this._removeTilesetListeners = null;
     this._credits.destroy();
     for (const promise of this._imageryProviders.values())
       void Promise.resolve(promise).then(

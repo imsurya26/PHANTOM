@@ -57,9 +57,9 @@ function presentStatus(state) {
   const pressed = state.enabled === true;
   const title = pressed ? 'Turn Street Level off' : 'Turn Street Level on';
   if (state.keyRejected)
-    return { text: 'KEY REJECTED', tone: 'warn', pressed, title };
+    return { text: 'UNAVAILABLE', tone: 'warn', pressed, title };
   if (state.keyRequired)
-    return { text: 'KEY REQUIRED', tone: 'warn', pressed, title };
+    return { text: 'UNAVAILABLE', tone: 'warn', pressed, title };
   if (state.coverage.loading)
     return { text: 'LOADING', tone: 'busy', pressed, title };
   return pressed
@@ -75,7 +75,7 @@ function presentProviders(state) {
     const on = enabled && provider.on === true;
     let title = `${provider.name} imagery ${on ? 'on' : 'off'}`;
     if (provider.keyRejected && provider.error)
-      title = `${provider.name}: ${provider.error}`;
+      title = `${provider.name}: Street imagery is temporarily unavailable. Other map features remain available.`;
     else if (keyRequired && provider.requiresKeyId)
       title = `${provider.name}: ${keySetupRequirement(provider.requiresKeyId)}`;
     else if (provider.error) title = `${provider.name}: ${provider.error}`;
@@ -150,9 +150,11 @@ export function presentStreetLevelPanel(state, { now = Date.now() } = {}) {
     status: presentStatus(state),
     controlsDisabled: keyRequired || state.providers.length === 0,
     providers: presentProviders(state),
-    error: keyMissing
-      ? null
-      : state.street.error || state.coverage.error || null,
+    error: state.keyRejected
+      ? 'Street imagery is temporarily unavailable. Other map features remain available.'
+      : keyMissing
+        ? null
+        : state.street.error || state.coverage.error || null,
     filter: { pano: filter.pano, sinceDays: Number(filter.sinceDays) || 0 },
     since: presentSince(filter.sinceDays, now),
     legend: state.legend || [],

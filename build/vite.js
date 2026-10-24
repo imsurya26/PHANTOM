@@ -1,5 +1,5 @@
 import { applicationHtmlPlugin } from './application-html.js';
-import cesium from 'vite-plugin-cesium';
+import { sceneAssetsPlugin } from './scene-assets.js';
 import { DEFAULT_ALLOWED_HOSTS, hostCheckPlugin } from './allowedHosts.js';
 import { embedFramingPlugin } from './embed-framing.js';
 import { panelBuildPlugin } from './panel.js';
@@ -59,10 +59,13 @@ export function createBrowserViteConfig({
   command,
 } = {}) {
   return {
+    // Only the three explicit client credentials below enter browser code.
+    // Disable Vite's implicit VITE_* export to avoid accidental secret aliases.
+    envPrefix: [],
     plugins: [
       // First, so no provider route answers a Host the server does not allow.
       hostCheckPlugin(),
-      cesium(),
+      sceneAssetsPlugin(),
       applicationHtmlPlugin(),
       ...plugins,
       embedFramingPlugin(),
@@ -105,13 +108,16 @@ export function createBrowserViteConfig({
     // framing + CSP hardening (one constant, no drift).
     preview: { headers: BROWSER_HEADERS },
     define: {
-      'import.meta.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleApiKey),
-      'import.meta.env.CESIUM_ION_TOKEN': JSON.stringify(cesiumToken),
+      'import.meta.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleApiKey ?? ''),
+      'import.meta.env.CESIUM_ION_TOKEN': JSON.stringify(cesiumToken ?? ''),
       // Mapillary client tokens are public by design (see SECURITY.md).
       'import.meta.env.MAPILLARY_CLIENT_TOKEN': JSON.stringify(
         mapillaryToken ?? '',
       ),
     },
-    build: { chunkSizeWarningLimit: 1500 },
+    build: {
+      chunkSizeWarningLimit: 1500,
+      rollupOptions: { input: { app: 'index.html', welcome: 'welcome.html' } },
+    },
   };
 }

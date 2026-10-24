@@ -14,6 +14,20 @@ export function formatAwarenessCount(summary = {}) {
     : count;
 }
 
+/** Let people finish reading or operating the inspector before its page changes. */
+export function awarenessPanelInteractionPaused(
+  panel,
+  doc = globalThis.document,
+) {
+  return Boolean(
+    doc?.hidden ||
+    panel?.hidden ||
+    panel?.contains?.(doc?.activeElement) ||
+    panel?.matches?.(':hover') ||
+    panel?.closest?.('[hidden], .collapsed'),
+  );
+}
+
 export function createPanel({ state: layerState, services, parts, source }) {
   function ensurePanel() {
     if (layerState.panel) return layerState.panel;
@@ -81,7 +95,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
           return `<li><span class="military-awareness-target unavailable" aria-label="Unavailable">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></span></li>`;
         }
         const accessibleLabel = label === '—' ? 'Unavailable' : label;
-        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="Focus ${escapeHtml(accessibleLabel)}">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
+        return `<li><button type="button" class="military-awareness-target" data-awareness-layer="${escapeHtml(cohort.id)}" data-awareness-id="${escapeHtml(targetId)}" aria-label="Focus ${escapeHtml(accessibleLabel)}, ${formatAwarenessDistance(item.distanceM)} away">${escapeHtml(label)} <span>${formatAwarenessDistance(item.distanceM)}</span></button>${namedAreasHtml(item.memberNames)}</li>`;
       })
       .join('');
     const pageCount = Math.max(
@@ -93,7 +107,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
         ? ` · ${Math.floor(page / AWARENESS_PAGE_SIZE) + 1}/${pageCount}`
         : '';
     const coverage = cohort.coverage ? ` · ${escapeHtml(cohort.coverage)}` : '';
-    return `<section class="military-awareness-row ${summary.relationship.toLowerCase()}">
+    return `<section class="military-awareness-row ${summary.relationship.toLowerCase()}" aria-label="Nearby ${escapeHtml(cohort.label)}">
     <div><strong>${escapeHtml(cohort.label)}</strong><b aria-live="polite">${count}${pageLabel}</b></div>
     <small>${escapeHtml(cohort.source)}${coverage} · ${escapeHtml(summary.reason)}</small>
     ${nearest ? `<ul>${nearest}</ul>` : ''}
@@ -104,7 +118,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
     const canPrevious = layerState.navigationIndex > 0;
     return `<div class="military-awareness-controls" role="group" aria-label="Global Context navigation">
     <button type="button" data-awareness-action="previous" title="Previous — prior visited contact in the 250 km window"${canPrevious ? '' : ' disabled'}>PREVIOUS</button>
-    <button type="button" data-awareness-action="focus">FOCUS</button>
+    <button type="button" data-awareness-action="focus" aria-label="Center the map on the selected object">FOCUS</button>
     <button type="button" data-awareness-action="next" title="Next — nearest unvisited contact in the 250 km window"${parts.navigation.canNavigateNext() ? '' : ' disabled'}>NEXT</button>
   </div>`;
   }
@@ -183,7 +197,8 @@ export function createPanel({ state: layerState, services, parts, source }) {
     if (!layerState.enabled || !layerState.results) return hidePanel();
     const panel = ensurePanel();
     const { subject, cohorts } = layerState.results;
-    const markup = `<div class="military-awareness-subject">${escapeHtml(subject.label)} · ${formatAwarenessDistance(AWARENESS_RADIUS_M)} FLIGHT / VESSEL WINDOW</div>
+    const markup = `<div class="military-awareness-subject" aria-label="Selected object">${escapeHtml(subject.label)} · ${formatAwarenessDistance(AWARENESS_RADIUS_M)} FLIGHT / VESSEL WINDOW</div>
+    <p class="military-awareness-note">Nearby context for this object. Choose a contact below to inspect it; Focus centers the map.</p>
     ${namedAreasHtml(subject.memberNames)}
     ${navigationControlsHtml()}
     ${cohorts.map(rowHtml).join('')}
@@ -199,6 +214,7 @@ export function createPanel({ state: layerState, services, parts, source }) {
 
   function rotateAwarenessPages() {
     if (!layerState.enabled || !layerState.results) return;
+    if (awarenessPanelInteractionPaused(layerState.panel)) return;
     let changed = false;
     for (const cohort of layerState.results.cohorts) {
       const pageCount = Math.max(

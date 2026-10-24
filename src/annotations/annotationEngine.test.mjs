@@ -1,4 +1,5 @@
 import { createStandalonePlaceSearch } from '../standalone/placeSearch.js';
+import { createGoogleGeocoder } from '../search/google.js';
 // Voice-annotation resilience contract tests — pure logic, no network, no browser.
 //
 // Locks the 2026-07-21 field-test fixes:
@@ -469,7 +470,9 @@ test('outline upgrade updates the rendered element in place without remove/add',
     sync() {},
   };
   const viewer = {};
-  const engine = createAnnotationEngine({ viewer, renderer, placeSearch: createStandalonePlaceSearch({ resolveApiKey: () => 'unit-test-key' }) });
+  const engine = createAnnotationEngine({ viewer, renderer, placeSearch: createStandalonePlaceSearch({ providers: { geocode: [
+    createGoogleGeocoder({ request: (query, { signal }) => fetch(`https://maps.googleapis.com/maps/api/geocode/json?${new URLSearchParams({ address: query })}`, { signal }) }),
+  ] } }) });
   const upgraded = new Promise((resolve) => engine.onOutlineEvent(resolve));
 
   const result = await engine.annotate([{

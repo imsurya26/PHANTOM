@@ -340,7 +340,11 @@ export async function fetchCctvMediaUpstream(
   if (downstream?.aborted) controller.abort();
   else downstream?.addEventListener?.('abort', onDownstreamAbort);
   try {
-    return await fetchImpl(url, { headers, signal: controller.signal });
+    return await fetchWithinHost(
+      url,
+      { headers, signal: controller.signal },
+      fetchImpl,
+    );
   } finally {
     clearTimeout(timeoutId);
     downstream?.removeEventListener?.('abort', onDownstreamAbort);

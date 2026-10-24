@@ -10,6 +10,7 @@ import { createLifecycle } from './lifecycle.js';
 import { createEvidence } from './evidence.js';
 import { createTesting } from './testing.js';
 import { createQueries } from './queries.js';
+import { syncFlightRenderDemand } from './renderDemand.js';
 /** Compose one civil-flight layer with application-owned scene services. */
 export function createCivilFlightLayer({
   source,
@@ -45,7 +46,11 @@ export function createCivilFlightLayer({
     feed: flightState.feed,
     getQuery: (viewer) =>
       parts.controller._flightQuery(viewer || flightState._viewer),
-    applySnapshot,
+    applySnapshot: (snapshot, viewer) => {
+      const accepted = applySnapshot(snapshot, viewer);
+      syncFlightRenderDemand(flightState, services.render);
+      return accepted;
+    },
     setSourceLabel: (source) => {
       layer.source = source;
     },

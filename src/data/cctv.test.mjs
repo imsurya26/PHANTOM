@@ -1207,7 +1207,8 @@ test('CCTV deselect publishes one null state and leaves the complete camera pose
     assert.equal(publications.at(-1).activeCameraId, null);
     assert.equal(publications.at(-1).activeCamera, null);
     assert.equal(publications.at(-1).enabled, true);
-    assert.equal(runtime.planeEntity.show, false);
+    assert.equal(runtime.planeEntity, null, 'deselect releases the media plane');
+    assert.equal(runtime.disposed, true);
     assert.equal(record.probeClampRangeM, null);
     assert.equal(record.activationDone, false);
     assert.deepEqual(viewer.camera.positionWC, pose.positionWC);

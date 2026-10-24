@@ -38,7 +38,21 @@ export class CctvControls {
     this._calibrationEdit = null;
     this._actionGeneration = 0;
     this._initCctvPanel();
-    if (this._cctvVideo && typeof MutationObserver !== 'undefined') {
+    if (this._cctvFrameWrap?.parentElement && typeof document !== 'undefined') {
+      this._cctvWatchBtn = document.createElement('button');
+      this._cctvWatchBtn.type = 'button';
+      this._cctvWatchBtn.textContent = 'Watch';
+      this._cctvWatchBtn.className = 'scene-btn cctv-watch-btn';
+      this._cctvWatchBtn.setAttribute(
+        'aria-label',
+        'Watch selected public camera',
+      );
+      this._cctvFrameWrap.before(this._cctvWatchBtn);
+      this.listen(this._cctvWatchBtn, 'click', () =>
+        this.cctv.setMediaWatching?.(!this._cctvState?.activeCamera?.watching),
+      );
+    }
+    if (this._cctvPanel && typeof MutationObserver !== 'undefined') {
       this._videoVisibilityObserver = new MutationObserver(() =>
         this._renderCctvState(this._cctvState),
       );
@@ -112,6 +126,8 @@ export class CctvControls {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.cctv.setMediaWatching?.(false);
+    this._cctvWatchBtn?.remove();
     this._cctvVideoSurface?.stop();
     this._videoVisibilityObserver?.disconnect();
     this._actionGeneration++;

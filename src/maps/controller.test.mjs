@@ -69,7 +69,146 @@ function fixture(registry, options = {}) {
 const settle = async () => {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 };
+
+test('Google tile failures switch to free globe, remove listeners and preserve scene identity', async () => {
+  const env = publicFixture();
+  const failed = event(),
+    loaded = event();
+  env.tileset.tileFailed = failed;
+  env.tileset.tileLoad = loaded;
+  const scene = env.viewer.scene;
+  await env.controller.setStack('photoreal');
+  failed.raise({ statusCode: 429, message: 'secret-in-url' });
+  failed.raise();
+  assert.equal(env.controller.getActiveId(), 'photoreal');
+  loaded.raise(); // A successful tile breaks a sequence of transient failures.
+  for (let i = 0; i < 3; i++)
+    failed.raise({ statusCode: 429, message: 'secret-in-url' });
+  await settle();
+  assert.equal(env.controller.getActiveId(), 'osm');
+  assert.equal(env.viewer.scene, scene);
+  assert.equal(scene.globe.show, true);
+  assert.equal(env.tileset.show, false);
+  assert.equal(failed.size, 0);
+  assert.equal(loaded.size, 0);
+  assert.match(env.controller.getState().lastError, /standard globe/);
+  const diagnostics = env.controller
+    .getStacks()
+    .find((s) => s.id === 'photoreal').diagnostic;
+  assert.equal(diagnostics.code, 'QUOTA_OR_RATE_LIMIT');
+  assert.doesNotMatch(
+    JSON.stringify(env.controller.getState()),
+    /secret-in-url/,
+  );
+  await env.controller.setStack('photoreal');
+  assert.equal(failed.size, 1);
+  env.controller.destroy();
+  assert.equal(failed.size, 0);
+});
+
+test('a failed 3D factory retries on explicit selection and never exposes upstream errors', async () => {
+  let calls = 0;
+  const registry = {
+    defaultId: 'osm',
+    recoveryId: 'osm',
+    sources: [
+      { descriptor: descriptor('osm'), imagery: async () => ({}) },
+      {
+        descriptor: descriptor('photoreal'),
+        createTileset: async () => {
+          if (++calls === 1)
+            throw Object.assign(
+              new Error('https://provider/?key=private-value'),
+              { statusCode: 403 },
+            );
+          return { show: false };
+        },
+      },
+    ],
+  };
+  const env = fixture(registry);
+  await env.controller.setStack('photoreal');
+  assert.equal(env.controller.getActiveId(), 'osm');
+  assert.doesNotMatch(
+    JSON.stringify(env.controller.getState()),
+    /private-value/,
+  );
+  assert.equal(
+    env.controller.getStacks().find((s) => s.id === 'photoreal').diagnostic
+      .code,
+    'ACCESS_DENIED',
+  );
+  await env.controller.setStack('photoreal');
+  assert.equal(env.controller.getActiveId(), 'photoreal');
+  assert.equal(calls, 2);
+  env.controller.destroy();
+});
 const descriptor = (id) => ({ id, label: id, kind: 'imagery' });
+
+test('cancelling a delayed voice map load preserves the active map and allows a later retry', async () => {
+  let resolve;
+  const abort = new AbortController();
+  const registry = {
+    defaultId: 'osm',
+    sources: [
+      { descriptor: descriptor('osm'), imagery: async () => ({}) },
+      {
+        descriptor: descriptor('photoreal'),
+        createTileset: () =>
+          new Promise((done) => {
+            resolve = done;
+          }),
+      },
+    ],
+  };
+  const env = fixture(registry);
+  await env.controller.setStack('osm');
+  const loading = env.controller.setStack('photoreal', {
+    signal: abort.signal,
+  });
+  await settle();
+  abort.abort();
+  await settle();
+  resolve({ show: false });
+  await loading;
+  assert.equal(env.controller.getActiveId(), 'osm');
+  assert.equal(env.primitives.length, 0);
+  assert.equal(env.viewer.scene.globe.show, true);
+  await env.controller.setStack('photoreal');
+  assert.equal(env.controller.getActiveId(), 'photoreal');
+  env.controller.destroy();
+});
+
+test('cancelling an older request cannot replace a newer manual map selection', async () => {
+  let resolve;
+  const abort = new AbortController();
+  const env = fixture({
+    defaultId: 'osm',
+    sources: [
+      { descriptor: descriptor('osm'), imagery: async () => ({}) },
+      { descriptor: descriptor('satellite'), imagery: async () => ({}) },
+      {
+        descriptor: descriptor('photoreal'),
+        createTileset: () =>
+          new Promise((done) => {
+            resolve = done;
+          }),
+      },
+    ],
+  });
+  await env.controller.setStack('osm');
+  const loading = env.controller.setStack('photoreal', {
+    signal: abort.signal,
+  });
+  await settle();
+  await env.controller.setStack('satellite');
+  abort.abort();
+  resolve({ show: false });
+  await loading;
+  assert.equal(env.controller.getActiveId(), 'satellite');
+  assert.equal(env.primitives.length, 0);
+  env.controller.destroy();
+});
 function publicFixture() {
   const tileset = { show: true };
   const registry = createDefaultMapSources({ googleTileset: tileset });
@@ -304,7 +443,8 @@ test('tooltips and rejected selection share the registry reason, including retir
     .find((stack) => stack.id === 'bing-aerial').unavailableReason;
   await env.controller.setStack('bing-aerial');
   assert.deepEqual(errors, [reason]);
-  assert.match(reason, /CESIUM_ION_TOKEN/);
+  assert.match(reason, /optional|unavailable/i);
+  assert.doesNotMatch(reason, /CESIUM_ION_TOKEN/);
   await env.controller.setStack('bing-road');
   assert.equal(env.controller.getActiveId(), 'photoreal');
   env.controller.destroy();
@@ -429,8 +569,14 @@ test('a failed recovery reports its error and leaves switching settled', async (
   );
   const result = await env.controller.setStack('first');
   assert.equal(result.status, 'ready');
-  assert.equal(result.lastError, 'recovery offline');
-  assert.deepEqual(errors, ['first offline', 'recovery offline']);
+  assert.equal(
+    result.lastError,
+    'Map imagery is temporarily unavailable. The globe remains available.',
+  );
+  assert.deepEqual(errors, [
+    'first is temporarily unavailable. Try another map style.',
+    'Map imagery is temporarily unavailable. The globe remains available.',
+  ]);
   assert.equal(env.changes.at(-1).status, 'error');
   assert.equal(env.imagery.length, 0);
   env.controller.destroy();

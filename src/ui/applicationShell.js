@@ -731,9 +731,9 @@ export class StyleManager extends ShellFacade {
    * @param {boolean} [options.syncShare=true] - Whether to update the share link.
    * @returns {Promise<void>}
    */
-  async _setMapStack(stackId, { syncShare = true } = {}) {
+  async _setMapStack(stackId, { syncShare = true, signal } = {}) {
     if (!this.mapStackController) return;
-    return this._mapSourceControls.select(stackId, { syncShare });
+    return this._mapSourceControls.select(stackId, { syncShare, signal });
   }
 
   /**
@@ -1184,7 +1184,8 @@ export class StyleManager extends ShellFacade {
    * @param {string} stackId - One of mapStackController.getStacks() ids.
    * @returns {Promise<{ok: boolean, activeStack?: string, error?: string|null, available?: string[]}>}
    */
-  async setMapStack(stackId) {
+  async setMapStack(stackId, { signal } = {}) {
+    if (signal?.aborted) return { ok: false, cancelled: true };
     if (!this.mapStackController) {
       return { ok: false, error: 'Map stack controller unavailable' };
     }
@@ -1204,7 +1205,8 @@ export class StyleManager extends ShellFacade {
         activeStack: this.mapStackController.getActiveId(),
       };
     }
-    await this._setMapStack(stackId);
+    await this._setMapStack(stackId, { signal });
+    if (signal?.aborted) return { ok: false, cancelled: true };
     const state = this.mapStackController.getState();
     const landed = state.activeId === stackId;
     return {

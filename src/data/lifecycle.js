@@ -1,4 +1,5 @@
 import { cancelCameraArrival } from './cameraArrival.js';
+import { createPeriodicPollGate, periodicPollPolicy } from './pollingPolicy.js';
 
 function cloneLayerParams(value) {
   if (Array.isArray(value)) return value.map(cloneLayerParams);
@@ -76,9 +77,14 @@ function refreshFailureFromStats(stats, label) {
 export class LayerLifecycle {
   constructor(
     viewer,
-    { allowQaRegistration = false, getSourceAvailability } = {},
+    {
+      allowQaRegistration = false,
+      getSourceAvailability,
+      getPollPolicy = periodicPollPolicy,
+    } = {},
   ) {
     this._catalogSourceAvailability = getSourceAvailability;
+    this._getPollPolicy = getPollPolicy;
     this.viewer = viewer;
     this._activityListeners = new Set();
     this.layers = new Map(); // id → { module, enabled, initialized, intervalId, lifecycleState, lifecycleUncertain }
@@ -538,12 +544,14 @@ export class LayerLifecycle {
           ? updateInterval
           : 0;
     if (refreshInterval > 0) {
+      const shouldPoll = createPeriodicPollGate(refreshInterval);
       entry.intervalId = setInterval(() => {
+        if (!entry.enabled || !shouldPoll(this._getPollPolicy())) return;
         void this._runPeriodicUpdate(layerId, entry);
       }, refreshInterval);
     } else if (updateInterval === 0) {
       entry.intervalId = setInterval(() => {
-        if (!entry.enabled) return;
+        if (!entry.enabled || this._getPollPolicy().paused) return;
         this._publishActivity({ type: 'status' });
       }, entry.module.statsRefreshInterval || 1000);
     }
@@ -2216,6 +2224,7 @@ export class LayerLifecycle {
         id,
         name: entry.module.name,
         icon: entry.module.icon,
+        source: entry.module.source || null,
         source: entry.module.source,
         showInTogglePanel: entry.module.showInTogglePanel !== false,
         // Registry id of the provider key this layer needs, if any (mirrors

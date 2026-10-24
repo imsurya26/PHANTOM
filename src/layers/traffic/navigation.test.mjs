@@ -12,6 +12,21 @@ function deferred() {
 }
 
 function setup(t, requestRoads, getStatus = async () => ({ hasKey: false })) {
+  // Cesium material type checks reference DOM constructors even for pure colors.
+  for (const name of [
+    'HTMLCanvasElement',
+    'HTMLImageElement',
+    'HTMLVideoElement',
+    'ImageBitmap',
+    'OffscreenCanvas',
+  ]) {
+    const previous = globalThis[name];
+    globalThis[name] = class {};
+    t.after(() => {
+      if (previous === undefined) delete globalThis[name];
+      else globalThis[name] = previous;
+    });
+  }
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
   const camera = {
     positionCartographic: Cesium.Cartographic.fromDegrees(

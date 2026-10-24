@@ -13,7 +13,6 @@ import {
   uninstallRenderGovernor,
   governorRequestRender,
 } from '../renderGovernor.js';
-import { describeError } from './errors.js';
 
 /** Construct the application globe using the caller's local configuration. */
 export async function createApplicationScene({
@@ -84,13 +83,9 @@ export async function createApplicationScene({
     console.info(`[Init] Google 3D Tiles loaded via ${photoreal.route}.`);
   } else {
     if (photoreal.errors.length) {
-      const tileError = photoreal.errors.at(-1);
-      console.warn(
-        '[Init] Google 3D Tiles unavailable, using the keyless globe:',
-        tileError,
-      );
-      const tileErrorDetail = describeError(tileError);
-      loaderStatus.textContent = `Google 3D Tiles unavailable (${tileErrorDetail}). Loading the keyless globe...`;
+      console.warn('[Init] Google 3D Tiles unavailable; using the free globe.');
+      loaderStatus.textContent =
+        'Google 3D is temporarily unavailable. Loading the free globe...';
     }
     viewer.scene.globe.show = true;
   }
@@ -101,6 +96,9 @@ export async function createApplicationScene({
     requestRender: governorRequestRender,
     ...mapOptions,
     googleTileset: tileset,
+    googleStartupError: photoreal.errors.at(-1),
+    googleApiKey,
+    googleTokens,
     cesiumToken,
     initialStack: tileset ? 'photoreal' : 'esri-imagery',
     // Task 5 (height-datum fix): rebroadcast stack changes as a window

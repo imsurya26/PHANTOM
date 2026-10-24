@@ -391,6 +391,7 @@ export function createLifecycle({
 
     /** Disables the layer: hides entities, stops the projection loop and load queue. */
     disable() {
+      parts.projection.setMediaWatching(false, { notify: false });
       services.credits?.hideOsmCredit?.(layerState._viewer, 'cctv');
       layerState._enabled = false;
       unregisterPickOwner('cctv');

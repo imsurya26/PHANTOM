@@ -204,7 +204,7 @@ test('the proxy relays its cache policy and upstream host through the mounted ro
   );
 });
 
-test('the query-string shape the client used to send is refused by the mounted route', async () => {
+test('query targets reach the mounted route without encoding route structure', async () => {
   await withUpstream(
     { [AUSTIN.stationStatusUrl]: STATION_STATUS },
     async (requested) => {
@@ -214,10 +214,10 @@ test('the query-string shape the client used to send is refused by the mounted r
       );
       assert.equal(
         response.status,
-        400,
-        'the old client URL is the 400 every city reported',
+        200,
+        'query target is supported and validated by the proxy',
       );
-      assert.deepEqual(requested, [], 'no upstream request is made for it');
+      assert.deepEqual(requested, [AUSTIN.stationStatusUrl]);
     },
   );
 });

@@ -63,6 +63,7 @@ export function createCctvLayer({ services, source }) {
       _setCctvOverlayHostForTest: parts.testing._setCctvOverlayHostForTest,
       createCctvProjectionOverlayEntry:
         parts.projection.createCctvProjectionOverlayEntry,
+      setMediaWatching: parts.projection.setMediaWatching,
       getActiveVideoElement: parts.projection.getActiveVideoElement,
       setCctvCardPresentationOptions:
         parts.cards.setCctvCardPresentationOptions,

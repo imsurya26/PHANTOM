@@ -10,7 +10,7 @@ import { createAlpsGeocoder } from './alpsGeocoder.js';
 
 /**
  * Coordinates, bundled names and the unqualified Alps first — all offline —
- * then Google when configured, then keyless Photon, then the local Nominatim
+ * then keyless Photon, then the local Nominatim
  * route as a last resort. Transport stays local to setup.
  *
  * `presets` is the caller's bundled place data. It is passed in rather than
@@ -18,7 +18,6 @@ import { createAlpsGeocoder } from './alpsGeocoder.js';
  * supplied there is simply no bundled-name provider.
  */
 export function createDefaultPlaceSearch({
-  resolveApiKey,
   fetchImpl = (...args) => fetch(...args),
   signal,
   endpoints = {},
@@ -42,20 +41,6 @@ export function createDefaultPlaceSearch({
       ...(selected
         ? [selected]
         : [
-            createGoogleGeocoder({
-              request(query, { bias, signal }) {
-                const key = resolveApiKey?.();
-                if (!key) return null;
-                const url = new URL(
-                  endpoints.geocode ||
-                    'https://maps.googleapis.com/maps/api/geocode/json',
-                );
-                url.searchParams.set('address', query);
-                url.searchParams.set('key', key);
-                if (bias) url.searchParams.set('bounds', bias);
-                return fetchImpl(url.toString(), { signal });
-              },
-            }),
             createPhotonGeocoder({ fetchImpl, endpoint: endpoints.photon }),
             // Last resort: the local Nominatim route, which answers with no key when
             // neither of the two above did. It speaks the same result shape, so it
@@ -77,7 +62,6 @@ export function createDefaultPlaceSearch({
   });
   const operations = createHttpGeospatialProvider({
     fetchImpl,
-    resolveApiKey,
     endpoints,
   });
   return {
@@ -102,6 +86,4 @@ export function createDefaultPlaceSearch({
 }
 
 // Compatibility for direct module callers. Application composition supplies its own instance.
-export const defaultGeospatial = createDefaultPlaceSearch({
-  resolveApiKey: () => globalThis.window?.__GOOGLE_MAPS_API_KEY__,
-});
+export const defaultGeospatial = createDefaultPlaceSearch();

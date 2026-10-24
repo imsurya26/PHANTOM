@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { createFixFrameCache } from './fixFrame.js';
 import {
   COURSE_HOLD_SPEED_MPS,
   lerpAngleDeg,
@@ -43,6 +44,7 @@ export function createMotion({
   layer,
   resolveAsset,
 }) {
+  const fixFrame = createFixFrameCache();
   const {
     cachedGroundFloor,
     GROUND_FLOOR_LIFT_M,
@@ -124,7 +126,7 @@ export function createMotion({
    * @returns {Cesium.Cartesian3|null} Estimated ECEF position, or null if no history exists.
    */
 
-  function _deadReckon(icao24, result) {
+  function _deadReckon(icao24, result, now = Cesium.JulianDate.now()) {
     const info = flightState.records.data.get(icao24);
     if (FOCUS_EVIDENCE_DEV && flightState._focusEvidenceIds.has(icao24)) {
       const position = flightState._billboards.get(icao24)?.position;
@@ -150,7 +152,7 @@ export function createMotion({
     // Render one poll interval behind real time so we interpolate between
     // two KNOWN fixes whenever possible (see RENDER_DELAY_SEC rationale).
     const renderTime = Cesium.JulianDate.addSeconds(
-      Cesium.JulianDate.now(),
+      now,
       -RENDER_DELAY_SEC,
       flightState._scratchRenderTime,
     );
@@ -286,11 +288,7 @@ export function createMotion({
       0,
       flightState._scratchOffset,
     );
-    const enu = Cesium.Transforms.eastNorthUpToFixedFrame(
-      fix.position,
-      Cesium.Ellipsoid.WGS84,
-      flightState._scratchEnu,
-    );
+    const enu = fixFrame(fix);
     return Cesium.Matrix4.multiplyByPoint(enu, flightState._scratchOffset, out);
   }
 

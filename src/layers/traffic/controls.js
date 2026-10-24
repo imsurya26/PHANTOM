@@ -25,9 +25,7 @@ export function createControls({ state: layerState, services, parts, source }) {
       notes.push(
         layerState._flowStatusUnavailable
           ? `${layerState._roadMode === 'tomtom' ? 'TomTom roads' : 'Hybrid'} unavailable while the traffic service is unreachable`
-          : layerState._roadMode === 'tomtom'
-            ? 'TomTom roads need a TomTom key'
-            : 'Hybrid needs a TomTom key',
+          : 'Using reference roads while measured traffic is unavailable',
       );
     if (layerState._surfacePending) notes.push('Local surface still loading');
     if (layerState._roadWarning) notes.push(layerState._roadWarning);
@@ -88,13 +86,19 @@ export function createControls({ state: layerState, services, parts, source }) {
             parts.viewport.onCameraChanged({ immediate: true });
         }
       }
-      if (typeof params.densityScale === 'number') {
+      if (
+        !layerState._operationalRoads &&
+        typeof params.densityScale === 'number'
+      ) {
         layerState._densityScale = Math.max(
           0.2,
           Math.min(2.5, params.densityScale),
         );
       }
-      if (typeof params.speedScale === 'number') {
+      if (
+        !layerState._operationalRoads &&
+        typeof params.speedScale === 'number'
+      ) {
         layerState._speedScale = Math.max(
           0.3,
           Math.min(3.0, params.speedScale),
@@ -161,11 +165,13 @@ export function createControls({ state: layerState, services, parts, source }) {
     getRowControls() {
       const selected =
         layerState._roadMode || resolveRoadMode(null, layerState._liveMode);
-      const needsKey = layerState._liveMode ? '' : ' (needs a TomTom key)';
+      const availability = layerState._liveMode
+        ? ''
+        : ' (reference roads used when unavailable)';
       const titles = {
-        tomtom: `TomTom roads only, each with its live flow${needsKey}`,
+        tomtom: `Measured road flow from TomTom${availability}`,
         osm: 'OpenStreetMap roads, with TomTom flow matched when available',
-        hybrid: `TomTom roads first; OpenStreetMap fills the rest, simulated${needsKey}`,
+        hybrid: `Measured TomTom flow with OpenStreetMap reference roads${availability}`,
       };
       const labels = { tomtom: 'TomTom', osm: 'OSM', hybrid: 'Hybrid' };
       return {
@@ -192,6 +198,7 @@ export function createControls({ state: layerState, services, parts, source }) {
      * @returns {Array<{position:Cesium.Cartesian3, id:string, type:string}>}
      */
     getDetectableObjects(options = {}) {
+      if (layerState._operationalRoads) return [];
       if (!layerState._enabled || layerState._dots.length === 0) return [];
       const maxCount = Number.isFinite(options.maxCount)
         ? Math.max(1, Math.floor(options.maxCount))
@@ -235,15 +242,12 @@ export function createControls({ state: layerState, services, parts, source }) {
 
     /**
      * Return current layer statistics for UI status chips.
-     * `mode` is the CONFIGURED source — 'live' (a TomTom key is present) or
-     * 'sim' (keyless simulation, which the manager renders as a FALLBACK chip);
-     * `error` carries this instant's health, so a live-configured layer whose
-     * flow feed went down reads DEGRADED with the reason instead of a stale
-     * LIVE coverage number. `flowCoveragePct` is shown dots on matched roads /
-     * all shown dots (0–100 int), excluding closures; `tilesFetched` counts flow-tile requests
+     * Operational `mode` is measured live flow or reference road geometry.
+     * `flowCoveragePct` counts measured road segments, never vehicle locations.
+     * `tilesFetched` counts flow-tile requests
      * issued to the proxy this session (decode-cache hits excluded).
      * @returns {{count:number, lastUpdate:number|null, loading:boolean,
-     *   mode:'live'|'sim', error:string|null, flowCoveragePct:number,
+     *   mode:'live'|'reference'|'sim', error:string|null, flowCoveragePct:number,
      *   tilesFetched:number}}
      */
     getLoadingDiagnostics() {
@@ -302,6 +306,16 @@ export function createControls({ state: layerState, services, parts, source }) {
         lastUpdate: layerState._lastUpdate,
         loading,
         mode: feed.mode,
+        fallback: feed.fallback,
+        dataKind: layerState._operationalRoads
+          ? feed.mode === 'live'
+            ? 'measured-flow'
+            : 'reference'
+          : 'simulation',
+        roadCount: layerState._operationalRoads
+          ? layerState._count
+          : layerState._roads.length,
+        vehicleCount: layerState._operationalRoads ? 0 : layerState._count,
         error:
           layerState._roadError ||
           layerState._roadWarning ||
@@ -335,7 +349,7 @@ export function createControls({ state: layerState, services, parts, source }) {
         // The settled flash carries NO progress number beside it — this label's
         // coverage figure is the chip's only percentage — so a label that ends
         // in one had better be the honest one. This is also where LIVE vs
-        // SIMULATED mode is surfaced, and it must never imply a live feed the
+        // REFERENCE mode is surfaced, and it must never imply a live feed the
         // layer does not have.
         roadMode: resolveRoadMode(layerState._roadMode, layerState._liveMode),
         roadModeRequested: layerState._roadMode,

@@ -91,6 +91,13 @@ export function createPresentation({
       mountHeightM: camera.mountHeightM,
       active: isActive,
       feedType: camera.feedType,
+      watching: layerState._watchCameraId === camera.id,
+      mediaDecoded: record.projection?.video?.readyState >= 2,
+      mediaMoving:
+        record.projection?.video?.currentTime > 0 &&
+        !record.projection?.video?.paused,
+      mediaDuration: record.projection?.video?.duration,
+      checkedAt: health?.updatedAt || null,
       isVideo:
         parts.model.isVideoFeedType(camera.feedType) &&
         record.projection?.mode !== 'image',

@@ -116,7 +116,17 @@ test('traffic construction is inert and parameters belong to each layer', async 
   const a = createTrafficLayer({ services, source });
   const b = createTrafficLayer({ services, source });
   a.setParams({ densityScale: 2, speedScale: 3, uncoveredRoads: 'hide' });
-  assert.equal(a.getParams().densityScale, 2);
+  assert.equal(
+    a.getParams().densityScale,
+    1,
+    'operational roads ignore synthetic population controls',
+  );
+  assert.equal(
+    a.getParams().speedScale,
+    1,
+    'measured speeds cannot be scaled by the viewer',
+  );
+  assert.equal(a.getParams().uncoveredRoads, 'hide');
   assert.equal(b.getParams().densityScale, 1);
   assert.equal(b.getParams().speedScale, 1);
   assert.equal(b.getParams().uncoveredRoads, 'sim');

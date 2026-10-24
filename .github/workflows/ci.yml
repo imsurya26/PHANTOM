@@ -40,6 +40,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Scan source and full Git history for credentials
+        run: npm run security:scan
+
       - name: Run setup policy checks
         run: npm run doctor -- --json
 
@@ -58,6 +61,9 @@ jobs:
 
       - name: Build production bundle
         run: npm run build
+
+      - name: Scan generated assets for credentials
+        run: npm run security:scan -- --artifacts --no-history
 
   street-level-browser:
     # Hermetic: every Mapillary request is answered from fixtures, so the

@@ -279,6 +279,7 @@ export function createCards({ state: layerState, services, parts, source }) {
   ) {
     if (typeof document !== 'undefined' && document.hidden && !userGesture)
       return;
+    if (layerState._watchCameraId !== record.camera.id) return;
     const now = Date.now();
     const cameraId = record.camera.id;
     layerState._cardFetchInFlightCount += 1;

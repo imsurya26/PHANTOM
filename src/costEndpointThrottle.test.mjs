@@ -237,9 +237,11 @@ test('the Google places route throttles by default and keeps its places[] contra
   for (let i = 0; i < GOOGLE_DEFAULT_PER_MIN; i += 1) {
     statuses.push((await request(handler, { url, method: 'GET' })).status);
   }
-  assert.ok(
-    statuses.every((s) => s === 200),
-    'the default must not throttle ordinary use',
+  assert.deepEqual(statuses.slice(0, 60), Array(60).fill(200));
+  assert.deepEqual(
+    statuses.slice(60),
+    Array(GOOGLE_DEFAULT_PER_MIN - 60).fill(429),
+    'the shared upstream budget applies before an individual client exhausts its ceiling',
   );
 
   const overLimit = await request(handler, { url, method: 'GET' });
@@ -250,7 +252,7 @@ test('the Google places route throttles by default and keeps its places[] contra
   assert.deepEqual(JSON.parse(overLimit.body).places, []);
   assert.equal(
     upstreamCalls,
-    GOOGLE_DEFAULT_PER_MIN,
+    60,
     'a throttled request must be refused before it reaches Google, or it still costs money',
   );
 });

@@ -1,5 +1,9 @@
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
+import {
+  readResponseTextCapped,
+  readResponseJsonCapped,
+} from './common/http.js';
 
 import { filterTrailing24h, parseFirmsCsv } from '../../src/data/firmsCsv.js';
 
@@ -29,6 +33,9 @@ import { filterTrailing24h, parseFirmsCsv } from '../../src/data/firmsCsv.js';
 export function firmsProxy() {
   const TTL_MS = 30 * 60_000;
   const STATUS_TTL_MS = 5 * 60_000;
+  const MAX_CACHE_BYTES = 64 * 1024 * 1024;
+  const MAX_FIRES = 600_000;
+  let cooldownUntil = 0;
   const SOURCES = [
     'VIIRS_NOAA20_NRT',
     'VIIRS_NOAA21_NRT',
@@ -54,11 +61,15 @@ export function firmsProxy() {
     if (diskChecked) return;
     diskChecked = true;
     try {
+      if ((await fsp.stat(CACHE_PATH)).size > MAX_CACHE_BYTES) return;
       const parsed = JSON.parse(await fsp.readFile(CACHE_PATH, 'utf8'));
       if (
         Number.isFinite(parsed?.at) &&
         Array.isArray(parsed?.sources) &&
-        Array.isArray(parsed?.fires)
+        Array.isArray(parsed?.fires) &&
+        parsed.fires.length <= MAX_FIRES &&
+        parsed.at <= Date.now() &&
+        Date.now() - parsed.at < 48 * 3600_000
       ) {
         mem = parsed;
       }
@@ -70,9 +81,11 @@ export function firmsProxy() {
   async function writeDisk(entry) {
     try {
       await fsp.mkdir(CACHE_DIR, { recursive: true });
-      await fsp.writeFile(CACHE_PATH, JSON.stringify(entry), 'utf8');
+      const serialized = JSON.stringify(entry);
+      if (Buffer.byteLength(serialized) <= MAX_CACHE_BYTES)
+        await fsp.writeFile(CACHE_PATH, serialized, 'utf8');
     } catch (err) {
-      console.warn('[firms-proxy] cache write failed:', err?.message || err);
+      console.warn('[firms-proxy] cache write failed');
     }
   }
 
@@ -83,9 +96,12 @@ export function firmsProxy() {
    */
   async function fetchSource(key, source) {
     const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(key)}/${source}/world/2`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
+    const signal = AbortSignal.timeout(60_000);
+    const res = await fetch(url, { signal, redirect: 'error' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const records = parseFirmsCsv(await res.text());
+    const records = parseFirmsCsv(
+      await readResponseTextCapped(res, 32 * 1024 * 1024, signal),
+    );
     if (records === null) throw new Error('non-CSV upstream response');
     return records;
   }
@@ -103,16 +119,15 @@ export function firmsProxy() {
     for (const source of SOURCES) {
       try {
         const records = filterTrailing24h(await fetchSource(key, source), now);
+        if (fires.length + records.length > MAX_FIRES)
+          throw new Error('FIRMS record limit');
         // NOT fires.push(...records): spread passes each record as an argument,
         // and a world/2 VIIRS pull exceeds V8's argument limit (~125k) at
         // ~131k records — RangeError, and the whole source is silently dropped.
         for (const record of records) fires.push(record);
         sources.push({ source, count: records.length, ok: true });
       } catch (err) {
-        console.warn(
-          `[firms-proxy] ${source} fetch failed:`,
-          err?.message || err,
-        );
+        console.warn(`[firms-proxy] ${source} fetch failed`);
         sources.push({ source, count: 0, ok: false });
       }
     }
@@ -146,19 +161,17 @@ export function firmsProxy() {
       statusInflight = (async () => {
         try {
           const url = `https://firms.modaps.eosdis.nasa.gov/mapserver/mapkey_status/?MAP_KEY=${encodeURIComponent(key)}`;
-          const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+          const signal = AbortSignal.timeout(10_000);
+          const res = await fetch(url, { signal, redirect: 'error' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const body = await res.json();
+          const body = await readResponseJsonCapped(res, 16 * 1024, signal);
           const used = Number(body?.current_transactions);
           const limit = Number(body?.transaction_limit);
           return Number.isFinite(used) && Number.isFinite(limit)
             ? { used, limit }
             : null;
         } catch (err) {
-          console.warn(
-            '[firms-proxy] mapkey status failed:',
-            err?.message || err,
-          );
+          console.warn('[firms-proxy] mapkey status failed');
           return null;
         }
       })()
@@ -184,7 +197,11 @@ export function firmsProxy() {
         res.end(JSON.stringify(obj));
       };
       try {
+        if (req.method !== 'GET')
+          return sendJson(405, { error: 'method_not_allowed' });
         const subPath = String(req.url || '').split('?')[0];
+        if (subPath !== '/' && subPath !== '' && subPath !== '/status')
+          return sendJson(404, { error: 'not_found' });
         const key = mapKey();
         await readDiskOnce();
 
@@ -222,6 +239,10 @@ export function firmsProxy() {
           sendJson(200, buildPayload(entry, false));
           return;
         }
+        if (Date.now() < cooldownUntil) {
+          if (entry) return sendJson(200, buildPayload(entry, true));
+          return sendJson(503, { error: 'firms_temporarily_unavailable' });
+        }
         // Stale or missing → refresh, single-flight (concurrent requests
         // share one upstream pass). Capture the promise locally BEFORE
         // awaiting: the .finally() nulls `inflight` the moment it settles.
@@ -233,8 +254,9 @@ export function firmsProxy() {
               return fresh;
             })
             .catch((err) => {
+              cooldownUntil = Date.now() + 60_000;
               console.warn(
-                `[firms-proxy] refresh failed (${err?.message || err}) — serving cache if any`,
+                '[firms-proxy] refresh failed — serving cache if any',
               );
               return null;
             })
@@ -254,7 +276,7 @@ export function firmsProxy() {
           });
         }
       } catch (err) {
-        console.warn('[firms-proxy] error:', err?.message || err);
+        console.warn('[firms-proxy] request failed');
         sendJson(500, { error: 'firms proxy error' });
       }
     });

@@ -7,6 +7,7 @@ import { createStandaloneControls } from './controls.js';
 import { createStandaloneData } from './data.js';
 import { createStandaloneTools } from './tools.js';
 import { createGoogleTokenSource } from '../maps/googleTokens.js';
+import { useFreeMapForSearch } from '../maps/searchPolicy.js';
 
 // The existing controls and layer catalog contain page-scoped state.
 let constructed = false;
@@ -48,6 +49,7 @@ export function createStandaloneApplication({
         cesiumToken,
         loaderStatus,
       });
+      placeSearch = useFreeMapForSearch(placeSearch, scene.mapStackController);
       catalog = createStandaloneCatalog({
         sources,
         streetLevelProviders,

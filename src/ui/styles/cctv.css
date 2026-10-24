@@ -365,3 +365,10 @@
   color: #a8f7ff;
   text-shadow: 0 0 10px rgba(0, 212, 255, 0.18);
 }
+
+/* A single explicit media control, large enough for touch. */
+.cctv-watch-btn {
+  min-height: 44px;
+  width: 100%;
+  margin-bottom: 8px;
+}

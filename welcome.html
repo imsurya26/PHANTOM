@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Explore Earth through aircraft observations, environmental events and mapped infrastructure. PHANTOM keeps sources and uncertainty in view."
+    />
+    <title>PHANTOM — See what the world doesn’t show.</title>
+    <link rel="icon" href="/phantom.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/phantom/landing.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/welcome.html"
+        ><img src="/phantom.svg" width="28" height="28" alt="" />PHANTOM</a
+      >
+      <nav aria-label="Main">
+        <a href="#inside">Inside PHANTOM</a><a href="#start">Getting started</a
+        ><a class="small-cta" href="/?welcome=0">Open explorer ↗</a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="hero" data-motion>
+        <div class="aurora" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow shiny">A different perspective on Earth</p>
+          <h1>See what the world<br /><em>doesn’t show.</em></h1>
+          <p class="intro">
+            Follow movement. Explore events. Find the context.<br />An open
+            window onto our changing planet—with the source always in view.
+          </p>
+          <div class="hero-actions">
+            <a class="rainbow-button" href="/?welcome=0"
+              >Explore Earth <span aria-hidden="true">↗</span></a
+            ><a class="text-link" href="#inside">Take a closer look ↓</a>
+          </div>
+          <p class="quiet">
+            Public data to get started. Coverage varies by source.
+          </p>
+        </div>
+        <div class="globe" aria-hidden="true">
+          <svg viewBox="0 0 500 500">
+            <defs>
+              <radialGradient id="ocean">
+                <stop stop-color="#315d61" />
+                <stop offset="1" stop-color="#0c2027" />
+              </radialGradient>
+              <clipPath id="sphere">
+                <circle cx="250" cy="250" r="216" />
+              </clipPath>
+            </defs>
+            <circle cx="250" cy="250" r="216" fill="url(#ocean)" />
+            <g
+              clip-path="url(#sphere)"
+              fill="none"
+              stroke="#9fc9b9"
+              stroke-opacity=".35"
+            >
+              <circle cx="250" cy="250" r="216" />
+              <ellipse cx="250" cy="250" rx="150" ry="216" />
+              <ellipse cx="250" cy="250" rx="65" ry="216" />
+              <ellipse cx="250" cy="250" rx="216" ry="74" />
+              <ellipse cx="250" cy="250" rx="216" ry="154" />
+              <path d="M34 250h432M250 34v432" />
+            </g>
+            <g fill="#d5eddf">
+              <circle cx="140" cy="163" r="4" />
+              <circle cx="303" cy="126" r="4" />
+              <circle cx="350" cy="306" r="4" />
+              <circle cx="189" cy="359" r="4" />
+            </g></svg
+          ><span>ONE PLANET. MANY PERSPECTIVES.</span>
+        </div>
+      </section>
+      <section class="inside" id="inside">
+        <div class="section-heading">
+          <p class="eyebrow">From the big picture to the details</p>
+          <h2>The world is connected.<br />Start seeing how.</h2>
+          <p>
+            Switch on the layers you need, inspect their sources, and follow a
+            question across the globe.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="magic-card">
+            <span class="number">01 / MOVEMENT</span>
+            <h3>Follow the observation.</h3>
+            <p>
+              Explore aircraft reports and satellite positions. Inspect
+              timestamps before interpreting a track.
+            </p>
+          </article>
+          <article class="magic-card">
+            <span class="number">02 / ENVIRONMENT</span>
+            <h3>Put events in place.</h3>
+            <p>
+              Find earthquakes and weather coverage. Source reports provide
+              context, not a complete account of an incident.
+            </p>
+          </article>
+          <article class="magic-card">
+            <span class="number">03 / CONTEXT</span>
+            <h3>Ask a better question.</h3>
+            <p>
+              Compare nearby records with Nexus and explore mapped
+              infrastructure. Proximity alone does not establish a connection.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section
+        class="product-preview"
+        data-motion
+        aria-labelledby="preview-title"
+      >
+        <div class="section-heading">
+          <p class="eyebrow">Inside the workspace</p>
+          <h2 id="preview-title">
+            Less searching through menus.<br />More exploring Earth.
+          </h2>
+        </div>
+        <div class="preview-track">
+          <figure class="desktop-preview">
+            <img
+              src="/preview/workspace.webp"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              alt="Actual PHANTOM desktop workspace showing the globe and exploration controls"
+            />
+            <figcaption>
+              Actual workspace capture. Data and availability change over time.
+            </figcaption>
+          </figure>
+          <figure class="mobile-preview">
+            <img
+              src="/preview/mobile.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              decoding="async"
+              alt="Actual PHANTOM mobile workspace with an accessible exploration panel"
+            />
+            <figcaption>Your perspective, anywhere.</figcaption>
+          </figure>
+        </div>
+      </section>
+      <section id="start" class="start" data-motion>
+        <p class="eyebrow">Your first minute</p>
+        <h2>A place. A layer. A new perspective.</h2>
+        <ol>
+          <li>
+            <strong>Search a place</strong>
+            <p>
+              Try a city, airport or coordinates. Drag to move and scroll or
+              pinch to zoom.
+            </p>
+          </li>
+          <li>
+            <strong>Choose a layer</strong>
+            <p>
+              Start with aircraft or earthquakes. Turn off layers you do not
+              need.
+            </p>
+          </li>
+          <li>
+            <strong>Inspect the source</strong>
+            <p>
+              Select a record to see what was reported, where it came from and
+              when.
+            </p>
+          </li>
+        </ol>
+        <a class="rainbow-button" href="/?welcome=0">Open the explorer ↗</a>
+        <p class="quiet">
+          Google 3D, voice and some data sources require owner configuration.
+          The explorer shows their current availability.
+        </p>
+      </section>
+    </main>
+    <footer>
+      <a class="brand" href="/welcome.html">PHANTOM</a>
+      <p>See what the world doesn’t show.</p>
+      <small
+        >Built on God’s Eye View by Bilawal Sidhu and contributors · MIT.<br />Each
+        data source retains its own attribution and terms.</small
+      >
+    </footer>
+    <script type="module" src="/src/phantom/landing.js"></script>
+  </body>
+</html>

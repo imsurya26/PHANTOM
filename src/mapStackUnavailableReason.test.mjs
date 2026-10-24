@@ -5,17 +5,14 @@ import {
   photorealUnavailableReason,
 } from './mapStackController.js';
 
-test('missing photoreal credentials explain both supported setup routes', () => {
-  assert.match(
-    photorealUnavailableReason(false),
-    /Needs GOOGLE_MAPS_API_KEY.*Provider Settings/,
-  );
-  assert.match(photorealUnavailableReason(false), /Cesium ion token/);
+test('missing photoreal credentials offer the free globe without setup demands', () => {
+  assert.match(photorealUnavailableReason(false), /optional.*free globe/);
+  assert.doesNotMatch(photorealUnavailableReason(false), /API|token|key/);
 });
 
 test('a configured but failed photoreal route does not ask for another key', () => {
   const reason = photorealUnavailableReason(true);
-  assert.match(reason, /unavailable.*restrictions, quota, or network/);
+  assert.match(reason, /unavailable.*free globe.*retry/);
   assert.doesNotMatch(reason, /Needs|add it/);
 });
 

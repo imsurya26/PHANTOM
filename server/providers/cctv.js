@@ -18,7 +18,6 @@ import {
 } from './cctv/constants.js';
 import { sanitizeCctvRangeHeader } from './cctv/range.js';
 import { createHlsPuller } from './cctv/stream.js';
-import { googleServerApiKey } from './places/google-key.js';
 export { CCTV_FRAME_FETCH_TIMEOUT_MS, fetchCctvImageFromUpstream };
 /**
  * Vite plugin: CCTV camera proxy with source registry, frame/media serving,
@@ -83,13 +82,14 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
 
   /**
    * Fetch a Google Street View static image as a fallback frame. Server-side
-   * call, never reaches the browser — prefers GOOGLE_MAPS_SERVER_API_KEY
-   * (#33: a key scoped to Street View Static/Places, restricted by server IP
-   * rather than HTTP referrer) and falls back to the browser-exposed
-   * GOOGLE_MAPS_API_KEY for setups that haven't split the two yet.
+   * call, never reaches the browser. This legacy optional fallback requires a
+   * separate Street View Static credential; Places and Map Tiles keys are never
+   * substituted. Without this optional key the normal synthetic fallback runs.
    */
   const streetViewFallback = async ({ lat, lon, heading, fov, pitch }) => {
-    const streetViewKey = googleServerApiKey();
+    const streetViewKey = String(
+      process.env.GOOGLE_STREETVIEW_SERVER_API_KEY || '',
+    ).trim();
     if (!streetViewKey || !Number.isFinite(lat) || !Number.isFinite(lon))
       return null;
     try {
@@ -113,6 +113,7 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
       sv.searchParams.set('key', streetViewKey);
 
       const svResp = await fetch(sv.toString(), {
+        redirect: 'error',
         headers: { 'User-Agent': 'gods-eye-view-cctv-proxy/1.0' },
         signal: AbortSignal.timeout(CCTV_FRAME_FETCH_TIMEOUT_MS),
       });
@@ -406,10 +407,10 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
             } else {
               setHealth(cameraId, {
                 status: 'ok',
-                sourceKind: isVideoFeedType(feedType) ? 'live' : 'snapshot',
+                sourceKind: isVideoFeedType(feedType) ? 'video' : 'snapshot',
                 label: source?.provider || 'Configured source',
                 message: isVideoFeedType(feedType)
-                  ? 'Live stream connected'
+                  ? 'Video response received; playback not verified'
                   : 'Snapshot feed connected',
               });
             }

@@ -165,7 +165,21 @@ export function _renderCctvState(state) {
     }
   }
 
-  const liveIntent = enabled && !!activeCamera?.isVideo;
+  const watching = enabled && !!activeCamera?.watching;
+  if (
+    watching &&
+    (document.hidden ||
+      this._cctvPanel?.hidden ||
+      this._cctvPanel?.classList.contains('collapsed'))
+  ) {
+    this.cctv.setMediaWatching?.(false);
+    return;
+  }
+  if (this._cctvWatchBtn) {
+    this._cctvWatchBtn.disabled = !enabled || !activeCamera;
+    this._cctvWatchBtn.textContent = watching ? 'Close viewer' : 'Watch';
+  }
+  const liveIntent = watching && !!activeCamera?.isVideo;
   if (this._cctvVideo) {
     this._cctvVideo.hidden = !liveIntent;
     if (this._cctvFrame) this._cctvFrame.hidden = liveIntent;
@@ -186,7 +200,7 @@ export function _renderCctvState(state) {
   }
 
   if (this._cctvFrame && !liveIntent) {
-    const nextSrc = enabled ? activeCamera?.frameUrl : null;
+    const nextSrc = watching ? activeCamera?.frameUrl : null;
     const nextCameraId = enabled ? activeCamera?.id || '' : '';
     const cameraChanged = this._cctvFrame.dataset.cameraId !== nextCameraId;
     const frameLoading = this._cctvFrame.dataset.loading === 'true';
@@ -222,19 +236,8 @@ export function _typeCctvSummary(text) {
   this._lastCctvSummaryText = nextText;
 
   clearInterval(this._cctvSummaryTypingTimer);
-  this._cctvSummary.textContent = '';
-  let idx = 0;
-  this._cctvSummaryTypingTimer = setInterval(() => {
-    if (this.destroyed) return;
-    idx += 3;
-    if (idx >= nextText.length) {
-      this._cctvSummary.textContent = nextText;
-      clearInterval(this._cctvSummaryTypingTimer);
-      this._cctvSummaryTypingTimer = null;
-      return;
-    }
-    this._cctvSummary.textContent = nextText.slice(0, idx);
-  }, 20);
+  this._cctvSummary.textContent = nextText;
+  this._cctvSummaryTypingTimer = null;
 }
 
 export function _updateCctvSyncChip(loading, enabled) {

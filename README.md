@@ -1,3 +1,36 @@
+# PHANTOM
+
+**See what the world doesn’t show.**
+
+A public-interest Earth exploration platform built on [God’s Eye View](https://github.com/bilawalsidhu/gods-eye-view). The original MIT license and all data attribution are retained.
+
+**Development status:** the PHANTOM shell, source context, initial Nexus proximity analysis and Gemini Live transport are implemented. This checkout is not approved for public production deployment. Owner authentication, authenticated provider end-to-end verification, remaining performance work and premium BYOK remain unfinished.
+
+See [credential integration and verification](docs/PHANTOM-CREDENTIALS.md) for environment names, provider boundaries, local kill switches and secret scanning. Credentials belong in ignored local configuration or the hosting provider's environment settings, never this repository.
+
+Use Node **24.14+ within 24.x, or 26.x**, then `npm ci` and `npm run dev`. Open `http://localhost:4173`. The globe can run without API credentials. Keep development local.
+
+Start with **Search Earth**, then **Layers**. Desktop navigation includes Explore, Layers, Search, Events, Nexus, Timeline, Voice, Map and More; phones use Explore, Layers, Events, Nexus and More. Help includes actionable examples and an optional short tour. Provider settings are optional under Settings → Advanced → Providers.
+
+For GitHub-connected hosting, see [Vercel deployment](docs/VERCEL_DEPLOYMENT.md). The public adapter currently covers OpenAQ and Gemini with shared usage controls; other server-backed layers still require deployment adaptation. A successful static build does not certify all live layers.
+
+The performance rework retains fire markers across viewport updates, suspends automatic polling while hidden/offline, adapts polling to constrained connections, and loads voice and optional panels on demand. Hardware FPS targets still require representative-device validation; software-rendered browser checks are not a hardware benchmark.
+
+- [Simple user guide](docs/USER_GUIDE.md)
+- [API keys and exposure boundaries](docs/API_KEYS.md)
+- [CCTV media verification](docs/CCTV_VALIDATION.md)
+- [Rescue changes, measured performance and remaining issues](docs/PHANTOM-RESCUE.md)
+- [Performance architecture and budgets](docs/ARCHITECTURE.md)
+- [Provider registry and fallbacks](docs/PROVIDERS.md)
+- [Engineering assessment and roadmap](docs/PHANTOM-ENGINEERING.md)
+- [PHANTOM providers and limitations](docs/PHANTOM-PROVIDERS.md)
+- [Design contract](DESIGN.md)
+- [Security](SECURITY.md) and [source licenses](DATA_SOURCES.md)
+
+The upstream documentation below describes retained functionality; references to the upstream brand and OpenAI voice are historical/current-upstream behavior, not a claim that the PHANTOM roadmap is complete.
+
+---
+
 <div align="center">
 
 # 🌐 God's Eye View
@@ -585,3 +618,7 @@ One heads-up from the inside: build in this space for a week and you learn that 
 **🌐 God's Eye View. No place left behind.**
 
 </div>
+
+### Welcome and navigation
+
+Open /welcome.html for the lightweight introduction, or / for the globe. Desktop uses a bottom dock; mobile keeps Explore, Layers, Events, Nexus and More visible. Map styles and source details have dedicated panels. See docs/USER_GUIDE.md for controls and docs/CORE_INTEGRATION_AUDIT.md for verified configuration limits.

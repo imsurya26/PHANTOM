@@ -85,8 +85,8 @@ export function createFirmsState({ services, config }) {
 
   /**
    * Occlusion-test anchors index-aligned with the billboard collection (the
-   * collection is cleared and refilled in one ordered pass per rebuild, and
-   * nothing else adds to it). Lifted where the render anchor sits at/below
+   * retained sprites keep collection order across viewport changes; rebuilding
+   * this index follows that order). Lifted where the render anchor sits at/below
    * the ellipsoid — see {@link fireCullPosition}.
    * @type {Array<Cesium.Cartesian3>}
    */

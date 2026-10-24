@@ -47,7 +47,19 @@ function repairKey(file, tmp, key) {
     // A repair completed between our earlier read and acquiring the lock.
     const winner = readKey(file);
     if (winner) return winner;
-    fs.renameSync(tmp, file);
+    for (;;) {
+      try {
+        fs.renameSync(tmp, file);
+        break;
+      } catch (error) {
+        // Windows may deny replacement briefly while a losing process reads
+        // the old file. Keep the repair lock and retry within the same bound;
+        // never return a different private key for a transient sharing conflict.
+        if (!['EPERM', 'EBUSY'].includes(error.code) || Date.now() >= deadline)
+          throw error;
+        Atomics.wait(pause, 0, 0, 10);
+      }
+    }
     return key;
   } finally {
     fs.closeSync(fd);

@@ -54,10 +54,9 @@ export async function createKeylessTerrain() {
         createKeylessTerrainResource(),
       ),
     };
-  } catch (error) {
+  } catch {
     console.warn(
-      '[MapStack] Re:Earth terrain unavailable, falling back to flat ellipsoid terrain:',
-      error,
+      '[MapStack] Re:Earth terrain unavailable; using flat ellipsoid terrain.',
     );
     return { provider: new Cesium.EllipsoidTerrainProvider() };
   }

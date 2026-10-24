@@ -1,5 +1,4 @@
 import { createStandaloneApplication } from './standalone/application.js';
-import { describeError } from './standalone/errors.js';
 
 const application = createStandaloneApplication({
   googleApiKey: import.meta.env.GOOGLE_MAPS_API_KEY,
@@ -7,11 +6,16 @@ const application = createStandaloneApplication({
   allowQaRegistration: import.meta.env.DEV,
 });
 
-application.start().catch((error) => {
-  console.error("God's Eye View initialization failed:", error);
+application.start().catch(() => {
+  // Provider exceptions may contain request URLs or credentials. Do not render
+  // or log arbitrary startup error objects in the public document.
+  console.error('PHANTOM initialization failed.');
   const loaderStatus = document.querySelector('#loading-screen .loader-status');
-  loaderStatus.textContent = `Error: ${describeError(error)}`;
-  loaderStatus.style.color = '#ff4444';
+  if (loaderStatus) {
+    loaderStatus.textContent =
+      'The explorer could not start. Reload the page to try again.';
+    loaderStatus.setAttribute('role', 'alert');
+  }
 });
 
 export { application };

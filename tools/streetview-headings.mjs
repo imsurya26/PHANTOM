@@ -17,7 +17,7 @@
  *   --pitch      Camera pitch in degrees (default: 0, range: -90 to 90)
  *   --size       Image size WxH (default: 640x640)
  *   --outdir     Output directory (default: output/)
- *   --key        Google Maps API key (default: reads from .env)
+ *   Credentials: GOOGLE_STREETVIEW_SERVER_API_KEY in the environment or .env.local.
  *   --neighbors  Also fetch 8 images from each first-order neighbor location
  */
 
@@ -26,7 +26,6 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectRoot } from '../scripts/project-root.mjs';
 import { parseEnv } from 'node:util';
-import { resolveGoogleServerKey } from '../scripts/google-server-key.mjs';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const PROJECT_ROOT = projectRoot(import.meta.url);
@@ -43,7 +42,7 @@ function parseArgs() {
       case '--pitch':      opts.pitch = parseInt(args[++i], 10); break;
       case '--size':       opts.size = args[++i]; break;
       case '--outdir':     opts.outdir = args[++i]; break;
-      case '--key':        opts.key = args[++i]; break;
+      case '--key':        throw new Error('Configure GOOGLE_STREETVIEW_SERVER_API_KEY in the local environment instead of passing credentials on the command line.');
       case '--step':       opts.step = parseInt(args[++i], 10); break;
       case '--neighbors':  opts.neighbors = true; break;
       case '--help':
@@ -60,15 +59,13 @@ function parseArgs() {
   return opts;
 }
 
-/** The explicit CLI key wins; otherwise prefer the server key across both stores. */
+/** Legacy Static API tooling requires its own credential; never reuse Places/Tiles keys. */
 export function loadApiKey(overrideKey, {
   environment = process.env,
-  envPath = join(PROJECT_ROOT, '.env'),
+  envPath = join(PROJECT_ROOT, '.env.local'),
 } = {}) {
-  if (overrideKey) return overrideKey;
-  const serverKey = resolveGoogleServerKey({
-    GOOGLE_MAPS_SERVER_API_KEY: environment.GOOGLE_MAPS_SERVER_API_KEY,
-  });
+  if (overrideKey) throw new Error('Use environment credentials only');
+  const serverKey = String(environment.GOOGLE_STREETVIEW_SERVER_API_KEY || '').trim();
   if (serverKey) return serverKey;
   let fromDotenv = {};
   try {
@@ -76,9 +73,9 @@ export function loadApiKey(overrideKey, {
   } catch (error) {
     if (error.code !== 'ENOENT') throw new Error('Could not read the Street View tool environment file');
   }
-  const key = resolveGoogleServerKey(environment, fromDotenv);
+  const key = String(environment.GOOGLE_STREETVIEW_SERVER_API_KEY ?? fromDotenv.GOOGLE_STREETVIEW_SERVER_API_KEY ?? '').trim();
   if (key) return key;
-  throw new Error('No API key found. Set GOOGLE_MAPS_SERVER_API_KEY (or GOOGLE_MAPS_API_KEY) in .env or pass --key.');
+  throw new Error('No API key found. Set GOOGLE_STREETVIEW_SERVER_API_KEY in .env.local.');
 }
 
 // ---------------------------------------------------------------------------

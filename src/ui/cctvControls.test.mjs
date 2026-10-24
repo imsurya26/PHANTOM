@@ -47,6 +47,27 @@ function fixture(t) {
   return { controls, requests };
 }
 
+test('the visible badge never upgrades a successful video response to live', (t) => {
+  const { controls } = fixture(t);
+  controls._cctvSourceBadge = element();
+  controls._syncCctvSourceBadge(
+    { sourceKind: 'live', sourceStatus: 'ok', isVideo: true, feedType: 'hls' },
+    true,
+  );
+  assert.match(controls._cctvSourceBadge.textContent, /^Unknown/);
+  controls._syncCctvSourceBadge(
+    {
+      isVideo: true,
+      feedType: 'mp4',
+      mediaDecoded: true,
+      mediaMoving: true,
+      mediaDuration: 11,
+    },
+    true,
+  );
+  assert.match(controls._cctvSourceBadge.textContent, /^Recorded video/);
+});
+
 test('a late image completion cannot replace a newer camera preview', (t) => {
   const { controls, requests } = fixture(t);
   controls._queueCctvFrame('first.jpg', 'a', true);

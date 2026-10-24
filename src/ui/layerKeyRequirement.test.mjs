@@ -63,13 +63,13 @@ test('the fire layer names the key it needs and reports when it is missing', () 
   );
 });
 
-test('the guidance names the environment variable and where to set it', () => {
+test('the guidance explains optional unavailability without demanding credentials', () => {
   const text = layerKeyRequirementTooltip({
     requiresKeyId: 'firms',
     stats: { keyRequired: true },
   });
-  assert.match(text, /FIRMS_MAP_KEY/);
-  assert.match(text, /Provider Settings/);
+  assert.match(text, /optional source is unavailable/);
+  assert.doesNotMatch(text, /FIRMS_MAP_KEY|Provider Settings/);
 });
 
 test('guidance appears only for a key that is actually missing and actually named', () => {
@@ -132,7 +132,10 @@ test('the manager publishes the declared key id on the row', async () => {
   const ungated = rows.find((row) => row.id === 'ungated');
   assert.equal(gated.requiresKeyId, 'firms');
   assert.equal(gated.stats.keyRequired, true);
-  assert.match(layerKeyRequirementTooltip(gated), /FIRMS_MAP_KEY/);
+  assert.match(
+    layerKeyRequirementTooltip(gated),
+    /optional source is unavailable/,
+  );
 
   assert.equal(
     ungated.requiresKeyId,

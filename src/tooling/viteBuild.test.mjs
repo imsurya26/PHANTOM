@@ -5,6 +5,23 @@ import { BROWSER_CSP, createBrowserViteConfig } from '../../build/vite.js';
 import standaloneConfig, * as compatibility from '../../vite.config.js';
 import * as providers from '../../server/providers/local.js';
 
+test('welcome build entry does not receive Cesium script or stylesheet injection', () => {
+  const config = createBrowserViteConfig();
+  const scene = config.plugins.find(
+    (plugin) => plugin.name === 'vite-plugin-cesium',
+  );
+  scene.config({}, { command: 'build' });
+  assert.deepEqual(scene.transformIndexHtml('', { path: '/welcome.html' }), []);
+  assert.ok(
+    scene
+      .transformIndexHtml('', { path: '/index.html' })
+      .some(
+        (tag) => tag.tag === 'script' && tag.attrs.src.endsWith('Cesium.js'),
+      ),
+  );
+  assert.equal(config.build.rollupOptions.input.welcome, 'welcome.html');
+});
+
 test('explicit build inputs preserve browser-only defines, plugin order and loopback protections', () => {
   const plugin = { name: 'fixture-provider' };
   const config = createBrowserViteConfig({
@@ -70,10 +87,7 @@ test('build helper does not discover environment values or construct local provi
   process.env.GOOGLE_MAPS_API_KEY = 'environment-fixture';
   try {
     const config = createBrowserViteConfig();
-    assert.equal(
-      config.define['import.meta.env.GOOGLE_MAPS_API_KEY'],
-      undefined,
-    );
+    assert.equal(config.define['import.meta.env.GOOGLE_MAPS_API_KEY'], '""');
     assert.deepEqual(
       config.plugins.slice(3).map((plugin) => plugin.name),
       ['embed-framing', 'panel-build'],
@@ -89,7 +103,17 @@ test('root config retains existing named exports and standalone provider order',
     assert.equal(compatibility[name], value, name);
   const config = standaloneConfig({ mode: 'test' });
   assert.deepEqual(
-    config.plugins.slice(3, -4).map((plugin) => plugin.name),
+    config.plugins.slice(3, 8).map((plugin) => plugin.name),
+    [
+      'phantom-gateway',
+      'phantom-signals',
+      'openaq-air-quality',
+      'phantom-provider-status',
+      'phantom-gemini-token',
+    ],
+  );
+  assert.deepEqual(
+    config.plugins.slice(8, -4).map((plugin) => plugin.name),
     providers.localProviderPlugins().map((plugin) => plugin.name),
   );
   assert.equal(config.plugins.at(-5).name, 'gev-key-setup');

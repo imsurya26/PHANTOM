@@ -1,4 +1,3 @@
-import { keySetupRequirement } from '../keySetupCore.mjs';
 /**
  * Why Google 3D is unavailable, phrased so the tooltip and toast recommend the
  * RIGHT fix. With no credentials the fix is a key (or the ion route); with a
@@ -10,6 +9,6 @@ import { keySetupRequirement } from '../keySetupCore.mjs';
  */
 export function photorealUnavailableReason(hasCredentials) {
   if (hasCredentials)
-    return "Google 3D tiles unavailable — check the key's API restrictions, quota, or network";
-  return `${keySetupRequirement('google-maps')} — or a Cesium ion token for the ion-hosted route`;
+    return 'Google 3D is temporarily unavailable. Try the free globe or retry later.';
+  return 'Google 3D is optional. The free globe is ready to explore.';
 }

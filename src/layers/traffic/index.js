@@ -25,6 +25,8 @@ export function createTrafficLayer({ services, source }) {
   )
     throw new TypeError('A traffic source is required');
   const state = createState({ services });
+  // Flow observations describe road speeds, never individual vehicle positions.
+  state._operationalRoads = true;
   const parts = {};
   const context = { state, services, parts, source };
   parts.style = createStyle(context);

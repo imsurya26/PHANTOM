@@ -218,7 +218,7 @@ export function createProjection({
       video.muted = true;
       video.playsInline = true;
       video.crossOrigin = 'anonymous';
-      video.preload = 'auto';
+      video.preload = 'none';
       // Cesium sizes the video texture from the element's width/height
       // attributes at first upload. Set them from the real stream dimensions
       // and rebind on any resolution change (camera switch, adaptive source).
@@ -232,6 +232,15 @@ export function createProjection({
       };
       video.addEventListener('loadedmetadata', bindVideoTexture);
       video.addEventListener('resize', bindVideoTexture);
+      video.addEventListener('playing', () =>
+        parts.presentation.notifyListeners(),
+      );
+      video.addEventListener('timeupdate', () => {
+        if (!runtime.reportedMoving && video.currentTime > 0) {
+          runtime.reportedMoving = true;
+          parts.presentation.notifyListeners();
+        }
+      });
       runtime.video = video;
       runtime.playback = attachCctvVideo(
         video,
@@ -305,7 +314,7 @@ export function createProjection({
    */
 
   function ensureProjectionRuntime(record) {
-    if (!record) return null;
+    if (!record || layerState._watchCameraId !== record.camera.id) return null;
     if (record.projection && !record.projection.disposed)
       return record.projection;
     const runtime = createProjectionRuntime(record);
@@ -401,6 +410,28 @@ export function createProjection({
    * to paint from. Null when the active feed is a still or not yet attached.
    * @returns {HTMLVideoElement|null}
    */
+  function setMediaWatching(watching, { notify = true } = {}) {
+    const active = parts.selection.getActiveRecord();
+    layerState._watchCameraId =
+      watching && layerState._enabled ? active?.camera.id || null : null;
+    for (const record of layerState._records) {
+      if (record.camera.id === layerState._watchCameraId || !record.projection)
+        continue;
+      destroyProjectionRuntime(record.projection);
+      record.projection = null;
+    }
+    layerState._projectionEntities = layerState._projectionEntities.filter(
+      (runtime) => !runtime.disposed,
+    );
+    if (layerState._watchCameraId) {
+      ensureProjectionRuntime(active);
+      parts.frames.refreshProjectionImage(active, true);
+      startProjectionLoop();
+    } else stopProjectionLoop();
+    parts.rendering.refreshCoverageStyles();
+    if (notify) parts.presentation.notifyListeners();
+  }
+
   function getActiveVideoElement() {
     if (!layerState._enabled) return null;
     return parts.selection.getActiveRecord()?.projection?.video || null;
@@ -424,6 +455,7 @@ export function createProjection({
   return {
     createCctvProjectionOverlayEntry,
     getActiveVideoElement,
+    setMediaWatching,
     updatePlanePlacement,
     clearProjectionOverlay,
     setPlaneVisible,

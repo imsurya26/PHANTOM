@@ -127,8 +127,9 @@ export function gbfsProxy() {
         }
 
         const url = new URL(req.url || '/', 'http://localhost');
+        const queryTarget = url.searchParams.get('url');
         const encodedTarget = url.pathname.replace(/^\/+/, '');
-        if (!encodedTarget) {
+        if (!encodedTarget && !queryTarget) {
           res.writeHead(400, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-store',
@@ -139,7 +140,7 @@ export function gbfsProxy() {
 
         let decodedTarget = '';
         try {
-          decodedTarget = decodeURIComponent(encodedTarget);
+          decodedTarget = queryTarget ?? decodeURIComponent(encodedTarget);
         } catch {
           res.writeHead(400, {
             'Content-Type': 'application/json',
@@ -161,7 +162,14 @@ export function gbfsProxy() {
           return;
         }
 
-        if (upstreamUrl.protocol !== 'https:') {
+        if (
+          upstreamUrl.protocol !== 'https:' ||
+          upstreamUrl.username ||
+          upstreamUrl.password ||
+          upstreamUrl.hash ||
+          upstreamUrl.port ||
+          upstreamUrl.search
+        ) {
           res.writeHead(400, {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-store',

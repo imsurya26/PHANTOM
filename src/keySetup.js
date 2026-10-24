@@ -316,9 +316,8 @@ export async function initKeySetup({
     chipLabel.textContent = keySetupChipLabel(status);
     chip.title = `Project keys: ${keySetupChipLabel(status)}`;
     chip.setAttribute('aria-label', chip.title);
-    // Fully powered is the owner's clean screen: the chip retires. The dialog
-    // stays reachable this session (and via ?setup=1) to swap or verify keys.
-    chip.hidden = status.setCount >= status.total;
+    // Optional owner configuration is reached only through Advanced settings.
+    chip.hidden = true;
     if (!rowsHost) return;
     rowsHost.textContent = '';
     for (const key of status.keys || [])
@@ -569,18 +568,6 @@ export async function initKeySetup({
   });
 
   render(status);
-
-  // Re-entry for a fully-keyed setup, demos, and support: ?setup=1 opens the
-  // dialog even though the chip has retired.
-  try {
-    if (
-      new URLSearchParams(globalThis.location?.search || '').get('setup') ===
-      '1'
-    )
-      openDialog();
-  } catch {
-    // An unparsable location never blocks init.
-  }
 
   disposeControls = () => {
     open = false;

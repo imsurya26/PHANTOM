@@ -3175,7 +3175,7 @@ function installKeyedFetch(t, handler) {
   });
 }
 
-test('voice Radio: a key that geocodes to nothing still places the station, keylessly', async (t) => {
+test('voice Radio: a configured Map Tiles key is never sent to geocoding', async (t) => {
   const { calls, dataManager } = radioSelectionHarness();
   const requests = [];
   installKeyedFetch(t, async (url) => {
@@ -3204,8 +3204,8 @@ test('voice Radio: a key that geocodes to nothing still places the station, keyl
   assert.equal(calls.length, 1);
   assert.ok(Math.abs(calls[0].criteria.anchor.lat - 20.9101) < 1e-9);
   assert.ok(Math.abs(calls[0].criteria.anchor.lon - 107.1839) < 1e-9);
-  // Google is asked first and exactly once; Photon answers unbiased, in one call.
-  assert.equal(requests.filter((url) => url.includes('maps.googleapis.com')).length, 1);
+  // The Map Tiles key has no geocoding scope; Photon answers in one call.
+  assert.equal(requests.filter((url) => url.includes('maps.googleapis.com')).length, 0);
   assert.equal(requests.filter((url) => url.includes('photon.komoot.io')).length, 1);
   assert.match(requests.at(-1), /[?&]q=H%E1%BA%A1\+Long\+Bay/);
   assert.doesNotMatch(requests.at(-1), /[?&](lat|lon|bbox)=/, 'a named radio location is not viewport-biased');

@@ -1,4 +1,5 @@
 import { LayerLifecycle } from '../data/lifecycle.js';
+import { periodicPollPolicy } from '../data/pollingPolicy.js';
 import { LayerPresentation } from './layerPresentation.js';
 import { createCyberSonarScene } from '../cyberSonarScene.js';
 /** Register the application layer catalog before allowing state restoration. */
@@ -14,6 +15,12 @@ export function createApplicationData({
   const dataManager = new LayerLifecycle(viewer, {
     allowQaRegistration,
     getSourceAvailability: catalog?.getSourceAvailability,
+    getPollPolicy: () =>
+      periodicPollPolicy({
+        hidden: document.hidden,
+        online: navigator.onLine !== false,
+        connection: navigator.connection,
+      }),
   });
   defer(async () => {
     await dataManager.destroyAll();
