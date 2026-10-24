@@ -1,4 +1,4 @@
 import { createVercelHandler } from '../server/vercel/handler.js';
 
-// Node req/res runtime: https://vercel.com/docs/functions/runtimes/node-js
+// vercel.json explicitly routes /api/* here, retaining the request URL.
 export default createVercelHandler();
