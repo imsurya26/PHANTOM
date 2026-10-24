@@ -3,7 +3,9 @@
   "framework": "vite",
   "buildCommand": "npx vite build --config build/vercel.config.js",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/api/:path*", "destination": "/api" }],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api?__phantom_route=:path*" }
+  ],
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60,
