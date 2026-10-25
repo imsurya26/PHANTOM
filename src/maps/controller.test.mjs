@@ -985,3 +985,53 @@ test('each switch generation reports its origin: an outside setStack is manual, 
   ]);
   recovering.controller.destroy();
 });
+
+test('satellite avoids 3D construction; selecting 3D binds draping and returning reuses it', async () => {
+  const { bindActiveTileset } = await import('../app/activeTileset.js');
+  let calls = 0;
+  let destroyed = false;
+  const tileset = {
+    show: false,
+    destroy() {
+      destroyed = true;
+    },
+    isDestroyed() {
+      return destroyed;
+    },
+  };
+  const env = fixture({
+    defaultId: 'esri-imagery',
+    sources: [
+      { descriptor: descriptor('esri-imagery'), imagery: async () => ({}) },
+      {
+        descriptor: descriptor('photoreal'),
+        createTileset: async () => {
+          calls++;
+          return tileset;
+        },
+      },
+    ],
+  });
+  const hosts = [];
+  const off = bindActiveTileset(env.controller, {
+    attachTileset: (host) => hosts.push(host),
+  });
+  await env.controller.setStack('esri-imagery');
+  assert.equal(calls, 0);
+  assert.equal(env.primitives.length, 0);
+  await env.controller.setStack('photoreal');
+  assert.equal(calls, 1);
+  assert.equal(hosts.at(-1), tileset);
+  assert.equal(tileset.enableCollision, true);
+  await env.controller.setStack('esri-imagery');
+  assert.equal(hosts.at(-1), null);
+  await env.controller.setStack('photoreal');
+  assert.equal(calls, 1);
+  assert.equal(hosts.at(-1), tileset);
+  off();
+  const count = hosts.length;
+  await env.controller.setStack('esri-imagery');
+  assert.equal(hosts.length, count);
+  env.controller.destroy();
+  assert.equal(destroyed, true);
+});

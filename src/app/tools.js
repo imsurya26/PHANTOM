@@ -1,3 +1,4 @@
+import { bindActiveTileset } from './activeTileset.js';
 import { SceneDirector } from '../scenes/director.js';
 import { initAnnotations } from '../annotations/index.js';
 import { initDrawTool } from '../annotations/drawTool.js';
@@ -60,8 +61,8 @@ export function createApplicationTools({
   // panel lives on the right rail, so both belong to the application
   // lifetime. The tileset lets the layer drape while the globe is hidden.
   const recentImagery = dataManager.layers.get('recent-imagery')?.module;
+  defer(bindActiveTileset(mapStackController, recentImagery));
   if (recentImagery) {
-    recentImagery.attachTileset(tileset);
     const imageryBoxTool = initImageryBoxTool({
       viewer,
       onBox: (box) => recentImagery.setBox(box),
@@ -145,7 +146,9 @@ export function createApplicationTools({
   window.__godsEyeView = {
     viewer,
     styleManager,
-    tileset,
+    get tileset() {
+      return scene.tileset;
+    },
     dataManager,
     sceneDirector,
     mapStackController,

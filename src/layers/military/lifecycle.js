@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { JET_MODEL_URL } from './policy.js';
+import { syncMilitaryRenderDemand } from './renderDemand.js';
 
 export function createLifecycle({
   flightState,
@@ -10,7 +11,7 @@ export function createLifecycle({
 }) {
   const { clearFocusTarget } = services.focus;
   const { registerSpriteCollection, restoreSpriteOrder } = services.sprites;
-  const { holdContinuousRender, releaseContinuousRender } = services.render;
+  const { releaseContinuousRender } = services.render;
   const { ensureGeoidReady } = services.geoid;
   const { registerPickOwner, unregisterPickOwner } = services.picking;
   const { setMilitaryLayerActive } = services.militaryRegistry;
@@ -115,7 +116,7 @@ export function createLifecycle({
     enable(viewer) {
       if (flightState._billboardCollection)
         flightState._billboardCollection.show = true;
-      holdContinuousRender('military'); // per-frame animator (perf wave 2)
+      syncMilitaryRenderDemand(flightState, services.render);
       if (flightState._modelCollection)
         flightState._modelCollection.show = true;
       parts.tracking._setCockpitContactMode(

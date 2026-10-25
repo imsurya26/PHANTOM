@@ -8,6 +8,7 @@ import { createIngestion } from './ingestion.js';
 import { createLifecycle } from './lifecycle.js';
 import { createTesting } from './testing.js';
 import { createQueries } from './queries.js';
+import { syncMilitaryRenderDemand } from './renderDemand.js';
 /** Compose one military-flight layer with application-owned scene services. */
 export function createMilitaryFlightLayer({
   source,
@@ -52,6 +53,14 @@ export function createMilitaryFlightLayer({
     parts.lifecycle.methods,
     parts.ingestion.methods,
   );
+  const update = layer.update;
+  layer.update = async (...args) => {
+    try {
+      return await update(...args);
+    } finally {
+      syncMilitaryRenderDemand(flightState, services.render);
+    }
+  };
   Object.defineProperty(layer, 'testing', { value: parts.testing });
   return layer;
 }

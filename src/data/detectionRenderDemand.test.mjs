@@ -465,7 +465,7 @@ test('aircraft brackets stay prompt because the aircraft layers hold the render 
     assert.ok(enable, `${file}: enable() is still identifiable`);
     assert.match(
       enable,
-      /holdContinuousRender\('(flights|military)'\)|syncFlightRenderDemand\(/,
+      /holdContinuousRender\('(flights|military)'\)|sync(?:Flight|Military)RenderDemand\(/,
       `${file}: enabling a populated layer must synchronize continuous render — detection no longer ` +
       'holds one, so this is what keeps its AIR brackets repainting on a parked scene',
     );

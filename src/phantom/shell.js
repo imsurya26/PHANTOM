@@ -1,4 +1,5 @@
 import { layerTrust } from './trust.js';
+import { createSpecialistPanelHost } from './specialistPanel.js';
 
 const sections = [
   'Explore',
@@ -60,6 +61,13 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   <footer class="phantom-footer"><span>Latest available observations · coverage varies</span><span class="phantom-feed-count" role="status"></span></footer>`;
   document.body.append(root);
   document.body.classList.add('phantom');
+  // Saved legacy panel positions must not leak into the product workspace.
+  document.body.classList.remove('phantom-advanced');
+  const specialist = createSpecialistPanelHost({
+    document,
+    root,
+    setCollapsed: (...args) => styleManager.setPanelCollapsed(...args),
+  });
   const drawer = root.querySelector('.phantom-drawer');
   const content = root.querySelector('.phantom-content');
   const title = root.querySelector('h2');
@@ -401,6 +409,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     }
   }
   function close(focus = true) {
+    specialist.close();
     drawerLifetime?.abort();
     active = null;
     drawer.hidden = true;
@@ -410,6 +419,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     if (focus) returnFocus?.focus();
   }
   function open(section, trigger) {
+    specialist.close();
     drawerLifetime?.abort();
     drawerLifetime = new AbortController();
     active = section;
@@ -544,6 +554,15 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
       });
       action('Map and visual settings', () => revealPanel('control-panel'));
       action('Advanced display tools', () => revealPanel('pp-toggles'));
+      action('Reset display', () => {
+        styleManager.setHudVisible('off');
+        void styleManager.applyVisualState({
+          style: 'normal',
+          scope: { enabled: false },
+          bloom: { enabled: false },
+          sharpen: { enabled: false },
+        });
+      });
       action('Show / hide instrument overlay', () =>
         styleManager.setHudVisible(styleManager.hud.visible ? 'off' : 'on'),
       );
@@ -607,9 +626,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
         { signal: drawerLifetime.signal },
       );
       action('Source status', () => open('Sources', returnFocus));
-      action('Show / hide advanced workspace', () => {
-        document.body.classList.toggle('phantom-advanced');
-      });
+      action('Advanced workspace controls', () => revealPanel('control-panel'));
       text('h3', 'About PHANTOM');
       text('p', 'See what the world doesn’t show.');
       text(
@@ -679,17 +696,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   function revealPanel(id) {
     close(false);
     const panel = document.getElementById(id);
-    if (panel?.closest('#command-dock'))
-      document.body.classList.add('phantom-advanced');
-    document.getElementById(id)?.classList.add('phantom-revealed');
-    styleManager.setPanelCollapsed(id, false, {
-      persist: false,
-      explicit: true,
-    });
-    document
-      .getElementById(id)
-      ?.querySelector('button, input, select')
-      ?.focus({ preventScroll: true });
+    specialist.open(panel, returnFocus);
   }
   function renderSources() {
     const rows = dataManager
@@ -824,6 +831,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   const stopData = dataManager.subscribeActivity(syncStatus);
   syncStatus();
   return () => {
+    specialist.destroy();
     drawerLifetime?.abort();
     controller.abort();
     stopMap?.();

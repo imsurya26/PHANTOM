@@ -243,15 +243,55 @@ body.phantom-light {
   accent-color: var(--accent);
 }
 /* The original workspace remains available through explicit advanced controls. */
-.phantom:not(.phantom-advanced)
-  .panel-collapsible.collapsed:not(.phantom-revealed),
-.phantom:not(.phantom-advanced) #command-dock,
-.phantom:not(.phantom-advanced) #top-center-actions,
-.phantom:not(.phantom-advanced) #key-setup-chip {
+.phantom .panel-collapsible:not(.phantom-revealed),
+.phantom #command-dock,
+.phantom #top-center-actions,
+.phantom #key-setup-chip {
   display: none !important;
 }
-.phantom-revealed {
-  z-index: 152 !important;
+.phantom-specialist {
+  position: fixed;
+  inset: 86px auto auto 20px;
+  z-index: 153;
+  width: min(390px, calc(100vw - 40px));
+  max-height: calc(100dvh - 220px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--phantom-border) var(--phantom-surface);
+  background: var(--phantom-surface);
+  border: 1px solid var(--phantom-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 12px 40px #0003;
+}
+.phantom-specialist-close {
+  width: 100%;
+  margin-bottom: 12px;
+}
+body.phantom #phantom-shell .phantom-specialist-body > .phantom-revealed {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+}
+.phantom-specialist .panel-resize-edge,
+.phantom-specialist .panel-resize-grip {
+  display: none !important;
+}
+@media (max-width: 850px) {
+  .phantom-specialist {
+    inset: auto 8px 84px;
+    width: auto;
+    max-height: calc(100dvh - 220px);
+  }
 }
 .phantom-search {
   position: relative;
