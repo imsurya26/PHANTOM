@@ -47,7 +47,19 @@ Gemini microphone/audio session, OpenAQ measurements, browser attribution and
 provider URL restrictions. Inspect the Vercel build and function logs without
 printing credentials. Until these checks pass, this is deployment preparation.
 
-## Verified local credential checks
+## Production checks on 25 October 2026
+
+The public domain returned HTTP 200 for regional flights (94 observations),
+military aircraft (73 observations), Chennai search (5 results), and Chennai
+OpenAQ locations (11 stations). Counts are snapshots and change continuously.
+The normal Gemini token route issued a bounded token; the constrained WebSocket
+completed setup and generated an audio response, then closed normally. This did
+not capture the user's microphone. The browser showed aircraft and fresh source
+status on the satellite view. Redis uses the free Upstash plan, Production only,
+with eviction disabled. Initial navigation uses a regional satellite view;
+Google 3D remains selectable. Other unadapted providers remain unavailable.
+
+## Earlier local credential checks
 
 On 23 October 2026, the configured OpenAQ key returned 11 stations around
 Chennai, and the Gemini key issued an ephemeral token. Neither result establishes
