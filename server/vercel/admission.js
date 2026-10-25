@@ -20,8 +20,14 @@ export function createPublicAdmission({
   if (!store) {
     try {
       store = redisLimiter({
-        url: env.PHANTOM_REDIS_REST_URL,
-        token: env.PHANTOM_REDIS_REST_TOKEN,
+        url:
+          env.PHANTOM_REDIS_REST_URL ||
+          env.KV_REST_API_URL ||
+          env.UPSTASH_REDIS_REST_URL,
+        token:
+          env.PHANTOM_REDIS_REST_TOKEN ||
+          env.KV_REST_API_TOKEN ||
+          env.UPSTASH_REDIS_REST_TOKEN,
         fetchImpl,
       });
     } catch {

@@ -47,13 +47,13 @@ export function flyToPreset(viewer, presetName, duration = 3.0) {
 }
 
 /**
- * Set camera to Austin on load with a cinematic fly-in.
+ * Start with a regional overview so the enabled aircraft layers are visible.
  * @returns {Function} Cancels the pending or active startup flight.
  */
 export function flyToAustin(viewer) {
-  // Start from a high altitude, then fly down
+  // Keep the initial view above aircraft altitude, not underneath the live feed.
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(-97.7431, 30.2672, 25000),
+    destination: Cesium.Cartesian3.fromDegrees(-97.7431, 30.2672, 300000),
     orientation: {
       heading: Cesium.Math.toRadians(0),
       pitch: Cesium.Math.toRadians(-90),
@@ -65,10 +65,10 @@ export function flyToAustin(viewer) {
   const timer = setTimeout(() => {
     if (viewer.isDestroyed()) return;
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(-97.7431, 30.2672, 600),
+      destination: Cesium.Cartesian3.fromDegrees(-97.7431, 30.2672, 150000),
       orientation: {
         heading: Cesium.Math.toRadians(15),
-        pitch: Cesium.Math.toRadians(-30),
+        pitch: Cesium.Math.toRadians(-70),
         roll: 0.0,
       },
       duration: 4.0,

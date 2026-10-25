@@ -185,7 +185,34 @@ test('quota failure closes microphone without opening a socket', async () => {
   assert.equal(f.sockets.length, 0);
   assert.equal(f.closes, 1);
   assert.equal(f.session.active, false);
-  assert.equal(f.states.at(-1), 'Unavailable');
+  assert.equal(f.states.at(-1), 'Usage limit reached. Try again later.');
+});
+
+test('microphone failures show actionable feedback without requesting a token', async () => {
+  for (const [name, message] of [
+    [
+      'NotAllowedError',
+      'Microphone permission denied. Allow microphone access and try again.',
+    ],
+    [
+      'NotFoundError',
+      'No microphone found. Connect a microphone and try again.',
+    ],
+  ]) {
+    let requests = 0;
+    const f = fixture({
+      audioFactory: async () => {
+        throw Object.assign(new Error(), { name });
+      },
+      fetchImpl: async () => {
+        requests++;
+      },
+    });
+    await f.session.start();
+    assert.equal(f.states.at(-1), message);
+    assert.equal(f.session.active, false);
+    assert.equal(requests, 0);
+  }
 });
 
 test('stop during microphone permission cleans a late grant and never provisions', async () => {

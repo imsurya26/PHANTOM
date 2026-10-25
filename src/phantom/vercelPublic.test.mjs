@@ -72,6 +72,27 @@ const tokenResponse = () =>
     status: 200,
   });
 
+test('Vercel Marketplace Redis environment supports durable public admission', async () => {
+  for (const prefix of ['KV_REST_API', 'UPSTASH_REDIS_REST']) {
+    let reservations = 0;
+    const admission = createPublicAdmission({
+      env: {
+        ...env,
+        [`${prefix}_URL`]: 'https://redis.example',
+        [`${prefix}_TOKEN`]: 'test-only',
+      },
+      fetchImpl: async (url, options) => {
+        assert.equal(new URL(url).hostname, 'redis.example');
+        assert.equal(options.headers.Authorization, 'Bearer test-only');
+        reservations++;
+        return new Response(JSON.stringify({ result: [1, 3600000] }));
+      },
+    });
+    assert.equal(await admission.admit(request(), response(), 'gemini'), true);
+    assert.equal(reservations, 4);
+  }
+});
+
 test('public Gemini mints only bounded one-use token and never returns permanent key', async () => {
   let body;
   const handler = createVercelHandler({

@@ -2,6 +2,7 @@ import { airQualityPlugin } from '../providers/airQuality.js';
 import { geminiTokenPlugin } from '../providers/gemini.js';
 import { createProviderStatus } from '../gateway/provider-status.js';
 import { createPublicAdmission, sendJson } from './admission.js';
+import { createPublicReadHandler } from './public-read.js';
 
 function middleware(plugin) {
   let handler;
@@ -22,6 +23,7 @@ export function createVercelHandler({
   now = Date.now,
 } = {}) {
   const admission = createPublicAdmission({ env, fetchImpl, limiter });
+  const publicRead = createPublicReadHandler({ fetchImpl, now });
   // Only the explicitly admitted Gemini handler can use this status instance.
   const status = createProviderStatus({
     env: { ...env, PHANTOM_PUBLIC_MODE: '0' },
@@ -61,9 +63,16 @@ export function createVercelHandler({
       ) {
         const providers = status.snapshot().map((provider) => {
           if (
-            ['gemini', 'openaq', 'cesium', 'google-tiles', 'free-map'].includes(
-              provider.id,
-            )
+            [
+              'gemini',
+              'openaq',
+              'cesium',
+              'google-tiles',
+              'free-map',
+              'adsb-lol',
+              'photon',
+              'usgs',
+            ].includes(provider.id)
           )
             return provider;
           return {
@@ -93,6 +102,7 @@ export function createVercelHandler({
           sendJson(res, 404, { state: 'unavailable' }),
         );
       }
+      if (await publicRead(req, res)) return;
       return sendJson(res, 503, {
         state: 'unavailable',
         message: 'This provider is not available in this deployment.',

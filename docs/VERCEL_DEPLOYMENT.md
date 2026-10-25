@@ -21,7 +21,10 @@ Mapillary viewing does not require publishing its client secret.
 Configure `PHANTOM_PUBLIC_ORIGIN` as the exact HTTPS production origin without a
 trailing slash. Configure `PHANTOM_REDIS_REST_URL` and
 `PHANTOM_REDIS_REST_TOKEN` for a dedicated Redis REST database shared by all
-function instances. Vercel supplies `VERCEL=1`. If the store or origin is missing,
+function instances. The Vercel Upstash integration's `KV_REST_API_URL` and
+`KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`)
+are also accepted. Keep eviction disabled so usage counters cannot be removed
+before their expiry. Vercel supplies `VERCEL=1`. If the store or origin is missing,
 the public API denies requests instead of silently using per-process counters.
 
 The public map is open to visitors. Gemini provisioning and OpenAQ reads are
@@ -30,8 +33,11 @@ caps, not a monetary billing guarantee; provider billing quotas remain separate.
 
 ## Current scope and release checks
 
-The public API explicitly adapts Gemini token provisioning, OpenAQ, and provider
-status. Other server endpoints return an unavailable response. Local receiver
+The public API explicitly adapts Gemini token provisioning, OpenAQ, provider
+status, regional live flights, worldwide military aircraft, and place search.
+Aircraft reads use adsb.lol public observations with bounded response sizes,
+timeouts, coalescing and caching. The initial camera opens at regional altitude
+so aircraft above the city are visible. Other server endpoints return an unavailable response. Local receiver
 access, credential editing, MCP and debug endpoints are never exposed. AISStream
 needs a persistent collector and shared snapshots rather than a socket started
 independently in each function invocation.

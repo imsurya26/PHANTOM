@@ -82,7 +82,13 @@ export function createGeminiSession({
       });
       if (!current()) return;
       if (!response.ok) {
-        stop('Unavailable');
+        stop(
+          response.status === 429
+            ? 'Usage limit reached. Try again later.'
+            : response.status === 403
+              ? 'Open voice from the public PHANTOM site.'
+              : 'Voice service unavailable. Please try again later.',
+        );
         return;
       }
       const data = await response.json();
@@ -192,8 +198,15 @@ export function createGeminiSession({
           fail();
         }
       };
-    } catch {
-      fail();
+    } catch (error) {
+      if (!current()) return;
+      if (error?.name === 'NotAllowedError')
+        stop(
+          'Microphone permission denied. Allow microphone access and try again.',
+        );
+      else if (error?.name === 'NotFoundError')
+        stop('No microphone found. Connect a microphone and try again.');
+      else fail();
     }
   }
   signal?.addEventListener('abort', () => stop(), { once: true });
