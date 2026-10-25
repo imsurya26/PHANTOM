@@ -2,6 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { restoreApiUrl } from '../../server/vercel/rewrite.js';
 
+test('Vercel named capture is removed before strict provider validation', () => {
+  assert.equal(
+    restoreApiUrl('/api?__phantom_route=military&path=military'),
+    '/api/military',
+  );
+  assert.equal(
+    restoreApiUrl('/api?__phantom_route=gemini/token&path=gemini%2Ftoken'),
+    '/api/gemini/token',
+  );
+  assert.equal(
+    restoreApiUrl('/api?__phantom_route=flights&path=flights&lat=30&lon=-97'),
+    '/api/flights?lat=30&lon=-97',
+  );
+  assert.equal(
+    restoreApiUrl('/api?__phantom_route=flights&path=unexpected'),
+    '/api/flights?path=unexpected',
+  );
+});
+
 test('Vercel rewrite restores nested API paths and provider parameters', () => {
   assert.equal(
     restoreApiUrl('/api?__phantom_route=providers/status'),

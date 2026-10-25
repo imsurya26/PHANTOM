@@ -6,6 +6,13 @@ export function restoreApiUrl(raw = '') {
   if (routes.length !== 1 || !/^[a-z-]+(?:\/[a-z-]+)*$/.test(routes[0]))
     return '/invalid-api-path';
   url.searchParams.delete('__phantom_route');
+  // Vercel also forwards the named source capture as `path`. It is routing
+  // metadata, not a provider parameter. Remove only an exact matching capture.
+  if (
+    url.searchParams.getAll('path').length === 1 &&
+    url.searchParams.get('path') === routes[0]
+  )
+    url.searchParams.delete('path');
   const query = url.searchParams.toString();
   return `/api/${routes[0]}${query ? `?${query}` : ''}`;
 }
