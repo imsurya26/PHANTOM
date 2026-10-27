@@ -1,5 +1,27 @@
 # Layer repair audit
 
+## Public deployment verification, 28 October 2026
+
+The older local audit below is historical; its missing-local-credential findings do not describe the current Vercel environment. Public URL: https://phantom-lake-two.vercel.app/.
+
+| Area | Current evidence | Remaining limit |
+|---|---|---|
+| Reload controls | Browser completed an enabled-layer reload; bounded concurrency, isolated failures, cooldown and duplicate suppression pass tests. Added synchronization when reopening the drawer during refresh. | Provider caches and quotas still apply. |
+| CCTV | Public catalog returned 3,182–3,356 snapshot cameras; an Austin image returned HTTP 200 with 302,036 JPEG bytes. Browser reports camera grid ready, 64/64. | Catalog availability varies; not every camera feed was opened. No synthetic 18-camera fallback. |
+| Flights | Public regional requests returned Austin 453, Chennai 53, London 668 observations. | Regional coverage; counts change. |
+| Satellites, earthquakes, fires, clouds | Browser rendered layer statuses with 827 satellites, 30 earthquakes, 10,000 partial fire observations and one cloud imagery layer. | Source timestamps, caps and coverage apply. |
+| Street Level | Mapillary coverage tile returned HTTP 200, 562,408 bytes. | Image selection and panorama playback not fully verified; zoom and coverage matter. |
+| Traffic | Configured status and real flow tile returned HTTP 200, 11,595 bytes. | Rendering not separately verified in this pass; shared request limits enforced. |
+| Directions | Austin route returned HTTP 200, valid geometry, distance 2,209 m and duration 214 s. | Full interactive routing flow not separately verified. |
+| Wind | Manifest available, 360×181 grid; binary returned HTTP 200, 521,280 bytes after decoder bundling repair. | Particle rendering not separately verified. |
+| Transit, cyclones, launches, radio | Public responses returned 7 feeds, 1 storm, 20 launches and 750 stations respectively. | Individual transit feeds and radio playback not exhaustively verified. |
+| Main panels | Explore, Layers, Events, Nexus, Timeline, Map, More and Settings opened in the browser. | Opening a panel does not verify every action inside it. |
+| Local ADS-B | Requires a connected receiver. | Cannot be supplied by a hosted API key. |
+| AIS vessels | Continuous upstream collection remains a deployment dependency. | Not verified working on this Vercel deployment. |
+| Other catalog options | See inventory below for ALPR, recent imagery, bike share, perimeters, radar/lightning, installations and bundled reference layers. | Browser acceptance remains outstanding for these rows. |
+
+Validation: focused reload/provider/rewrite tests pass; production build passes with existing large-chunk warnings; secret scanner reports no findings across 2,211 files and Git history. These checks establish specific repairs, not a guarantee that every third-party source is always available.
+
 Checked 22 October 2026. This is an evidence ledger, not a declaration that every layer passed browser acceptance. `NOT VERIFIED` explicitly means that a current end-to-end result is still required. HTTP success alone does not prove markers or imagery rendered.
 
 ## Reproduced defects and evidence

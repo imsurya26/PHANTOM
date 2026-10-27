@@ -214,13 +214,12 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
       if (reloadRunning) return;
       reloadRunning = true;
       reloadAll.disabled = true;
-      const lifetime = drawerLifetime.signal;
       try {
         const results = await reloader.reloadEnabled({
           signal,
           report: (done, total) => {
             reloadMessage = `Refreshing ${done} of ${total} layers…`;
-            if (!lifetime.aborted) reloadStatus.textContent = reloadMessage;
+            syncReloadControls();
           },
         });
         const failed = results.filter((result) => result.ok === false).length;
@@ -229,19 +228,18 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
           : 'No layers enabled. Choose a layer below first.';
       } finally {
         reloadRunning = false;
-        if (!lifetime.aborted) {
-          reloadAll.disabled = false;
-          reloadStatus.textContent = reloadMessage;
-          syncLayerCards();
-        }
+        syncReloadControls();
+        syncLayerCards();
       }
     });
     reloadAll.disabled = reloadRunning;
+    reloadAll.dataset.reloadAll = '';
     const reloadStatus = text(
       'p',
       reloadRunning ? 'Reload in progress…' : reloadMessage,
     );
     reloadStatus.setAttribute('role', 'status');
+    reloadStatus.dataset.reloadStatus = '';
     const groups = [
       [
         'Live Activity',
@@ -348,6 +346,12 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     }
     syncLayerCards();
     action('Explore street imagery', () => open('Street View', returnFocus));
+  }
+  function syncReloadControls() {
+    const button = content.querySelector('[data-reload-all]');
+    const status = content.querySelector('[data-reload-status]');
+    if (button) button.disabled = reloadRunning;
+    if (status) status.textContent = reloadMessage;
   }
   function syncLayerCards() {
     const cards = new Map(
