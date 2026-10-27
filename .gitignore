@@ -19,6 +19,7 @@ qa-artifacts/
 .DS_Store
 .vercel/
 .gstack/
+graphify-out/
 3d-models/
 pinokio/ENVIRONMENT
 pinokio/.installed

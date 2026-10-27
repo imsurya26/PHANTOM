@@ -99,6 +99,15 @@ export function createPublicAdmission({
         return false;
       }
     },
+    async firmsFetch(url, options) {
+      // Key-backed global snapshots must stay bounded across cold starts.
+      const result = await reserve([
+        ['firms:upstream:hour', 16, 3600000],
+        ['firms:upstream:day', 240, 86400000],
+      ]);
+      if (!result.allowed) throw new Error('Fire data usage limit reached');
+      return fetchImpl(url, options);
+    },
     async openaqFetch(url, options) {
       // Count each real upstream call, including fan-out, independently of caches.
       const result = await reserve([

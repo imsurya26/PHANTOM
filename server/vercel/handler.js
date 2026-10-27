@@ -3,6 +3,7 @@ import { geminiTokenPlugin } from '../providers/gemini.js';
 import { createProviderStatus } from '../gateway/provider-status.js';
 import { createPublicAdmission, sendJson } from './admission.js';
 import { createPublicReadHandler } from './public-read.js';
+import { createEnvironmentHandler } from './environment.js';
 
 function middleware(plugin) {
   let handler;
@@ -24,6 +25,12 @@ export function createVercelHandler({
 } = {}) {
   const admission = createPublicAdmission({ env, fetchImpl, limiter });
   const publicRead = createPublicReadHandler({ fetchImpl, now });
+  const environment = createEnvironmentHandler({
+    env,
+    fetchImpl,
+    firmsFetch: admission.firmsFetch,
+    now,
+  });
   // Only the explicitly admitted Gemini handler can use this status instance.
   const status = createProviderStatus({
     env: { ...env, PHANTOM_PUBLIC_MODE: '0' },
@@ -72,6 +79,8 @@ export function createVercelHandler({
               'adsb-lol',
               'photon',
               'usgs',
+              'celestrak',
+              'firms',
             ].includes(provider.id)
           )
             return provider;
@@ -103,6 +112,7 @@ export function createVercelHandler({
         );
       }
       if (await publicRead(req, res)) return;
+      if (await environment(req, res)) return;
       return sendJson(res, 503, {
         state: 'unavailable',
         message: 'This provider is not available in this deployment.',

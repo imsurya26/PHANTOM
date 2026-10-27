@@ -1,5 +1,6 @@
 import * as Cesium from 'cesium';
 import { twoline2satrec } from 'satellite.js';
+import { syncSatelliteRenderDemand } from './renderDemand.js';
 import {
   DENSE_REFRESH_FRAMES,
   DENSE_GROUP_PATH,
@@ -184,6 +185,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
     } finally {
       if (layerState._denseLoadController === resourceController)
         layerState._denseLoadController = null;
+      syncSatelliteRenderDemand(layerState, services.render);
     }
   }
 
@@ -228,6 +230,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
     layerState._denseCursor = 0;
     layerState._count = layerState._points.size;
     layerState._catalogRevision++;
+    syncSatelliteRenderDemand(layerState, services.render);
   }
   return {
     _abortActiveUpdates,

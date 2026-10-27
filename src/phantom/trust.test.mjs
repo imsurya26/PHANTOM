@@ -2,6 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { layerTrust } from './trust.js';
 
+test('receiver and continuous collector requirements are explained honestly', () => {
+  const local = layerTrust({
+    id: 'local-adsb',
+    enabled: true,
+    stats: { status: 'idle', count: 0 },
+  });
+  assert.equal(local.state, 'Receiver required');
+  assert.match(local.explanation, /radio receiver/);
+  const ais = layerTrust({
+    id: 'ais-live-vessels',
+    enabled: true,
+    stats: { unavailable: true },
+  });
+  assert.match(ais.explanation, /continuously connected AIS collector/);
+  assert.equal(
+    layerTrust({
+      id: 'local-adsb',
+      enabled: true,
+      stats: { status: 'live', count: 2 },
+    }).state,
+    'Enabled',
+  );
+});
+
 test('missing keys and degraded feeds never become live claims', () => {
   assert.equal(
     layerTrust({ enabled: true, stats: { keyRequired: true } }).state,

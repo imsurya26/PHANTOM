@@ -99,6 +99,8 @@ export function createLifecycle({
       layerState._lastUpdate = null;
       layerState._keyRequired = false;
       layerState._stale = false;
+      layerState._partial = false;
+      layerState._coverage = '';
       layerState._error = null;
       layerState._currentLodId = null;
       overlayHost.clearSource(FIRMS_OVERLAY_SOURCE_ID);

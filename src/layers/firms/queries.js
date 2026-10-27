@@ -81,6 +81,8 @@ export function createQueries({
         lastUpdate: layerState._lastUpdate,
         loading: layerState._loading,
         stale: layerState._stale,
+        partial: layerState._partial,
+        coverage: layerState._coverage,
         // The machine-readable half of the keyless state, ahead of the human
         // strings below: without it "no key configured" is indistinguishable
         // from a broken feed, and the row reads as a fault instead of a step

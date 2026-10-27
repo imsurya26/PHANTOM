@@ -1,6 +1,7 @@
 import { twoline2satrec } from 'satellite.js';
 import * as Cesium from 'cesium';
 import { CATALOG_GROUPS, ISS_NORAD, POINT_STYLES } from './policy.js';
+import { syncSatelliteRenderDemand } from './renderDemand.js';
 
 export function createIngestion({
   state: layerState,
@@ -185,6 +186,7 @@ export function createIngestion({
         console.warn('[Data:Satellites] Fetch error:', e);
       } finally {
         layerState._activeUpdateControllers.delete(resourceController);
+        syncSatelliteRenderDemand(layerState, services.render);
       }
     },
   };

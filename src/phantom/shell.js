@@ -1,5 +1,6 @@
 import { layerTrust } from './trust.js';
 import { createSpecialistPanelHost } from './specialistPanel.js';
+import { enableLayerWithFeedback, layerActionMessage } from './layerAction.js';
 
 const sections = [
   'Explore',
@@ -370,14 +371,18 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   }
   async function enable(id) {
     const button = content.querySelector(`[data-enable="${id}"]`);
+    const status = content.querySelector(`[data-enable-status="${id}"]`);
+    const lifetime = drawerLifetime.signal;
     if (button) button.disabled = true;
     try {
-      await dataManager.setEnabled(id, true, { origin: 'user' });
-    } catch {
-      text(
-        'p',
-        'This layer is temporarily unavailable. You can keep exploring the map.',
-      );
+      await enableLayerWithFeedback({
+        dataManager,
+        id,
+        signal: lifetime,
+        report: (message) => {
+          if (status) status.textContent = message;
+        },
+      });
     } finally {
       if (button) button.disabled = false;
     }
@@ -385,6 +390,9 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   function layerAction(label, id) {
     if (!dataManager.getAll().some((layer) => layer.id === id)) return;
     action(label, () => enable(id)).dataset.enable = id;
+    const status = text('p', '');
+    status.dataset.enableStatus = id;
+    status.setAttribute('role', 'status');
   }
   async function lazyPanel(path, exportName, options) {
     const lifetime = drawerLifetime.signal;
@@ -688,14 +696,19 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
         'p',
         'Weather layers have their own available frame controls. Saved scenes can play a camera sequence without changing the observation dates of live sources.',
       );
-      action('Weather layer controls', () => revealPanel('data-panel'));
+      layerAction('Load satellite clouds', 'weather-satellite');
+      action('Weather layer controls', () => revealPanel('weather-panel'));
       action('Saved scenes and playback', () => revealPanel('scene-panel'));
     } else renderSources();
     drawer.querySelector('.phantom-close').focus({ preventScroll: true });
   }
   function revealPanel(id) {
-    close(false);
     const panel = document.getElementById(id);
+    if (!panel) {
+      text('p', 'These controls are not available in this installation.');
+      return;
+    }
+    close(false);
     specialist.open(panel, returnFocus);
   }
   function renderSources() {
@@ -739,6 +752,14 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
       renderSources();
     }
     if (active === 'Layers') syncLayerCards();
+    for (const status of content.querySelectorAll('[data-enable-status]')) {
+      if (!status.textContent) continue;
+      status.textContent = layerActionMessage(
+        dataManager
+          .getAll()
+          .find((layer) => layer.id === status.dataset.enableStatus),
+      );
+    }
   }
   root.querySelectorAll('[data-section]').forEach((button) =>
     button.addEventListener(

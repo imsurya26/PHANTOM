@@ -78,6 +78,14 @@ export function layerTrust(layer, now = Date.now()) {
     explanation =
       'Updates are delayed or incomplete. Previously retrieved data may still be shown.';
   }
+  if (layer.id === 'local-adsb' && layer.enabled && status === 'idle') {
+    state = 'Receiver required';
+    explanation =
+      'Local ADS-B needs a connected radio receiver or decoder feed. Use Live Flights for aircraft without additional hardware.';
+  } else if (layer.id === 'ais-live-vessels' && state === 'Unavailable') {
+    explanation =
+      'Live vessels need a continuously connected AIS collector. An API key alone cannot provide the stream on this deployment.';
+  }
   return {
     id: layer.id,
     name: layer.name || layer.id,

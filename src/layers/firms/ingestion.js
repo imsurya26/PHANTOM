@@ -37,6 +37,12 @@ export function createIngestion({
       layerState._keyRequired = false;
       layerState._error = null;
       layerState._stale = Boolean(payload?.stale);
+      layerState._partial = Boolean(
+        payload?.truncated ||
+        payload?.sources?.some((source) => source.ok === false),
+      );
+      layerState._coverage =
+        typeof payload?.coverage === 'string' ? payload.coverage : '';
       const previousSelection = layerState._selectedFire;
       layerState._selectedFire = null;
       layerState._fires = adaptFirmsRecords(payload?.fires);
