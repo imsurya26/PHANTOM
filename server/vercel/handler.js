@@ -4,6 +4,8 @@ import { createProviderStatus } from '../gateway/provider-status.js';
 import { createPublicAdmission, sendJson } from './admission.js';
 import { createPublicReadHandler } from './public-read.js';
 import { createEnvironmentHandler } from './environment.js';
+import { createCameraHandler } from './cameras.js';
+import { createOptionalReadHandler } from './optional.js';
 
 function middleware(plugin) {
   let handler;
@@ -25,6 +27,8 @@ export function createVercelHandler({
 } = {}) {
   const admission = createPublicAdmission({ env, fetchImpl, limiter });
   const publicRead = createPublicReadHandler({ fetchImpl, now });
+  const cameras = createCameraHandler({ env, fetchImpl, now });
+  const optional = createOptionalReadHandler({ fetchImpl, now });
   const environment = createEnvironmentHandler({
     env,
     fetchImpl,
@@ -56,7 +60,10 @@ export function createVercelHandler({
   return async (req, res) => {
     const raw = req.url || '';
     const path = raw.split('?')[0];
-    if (raw.length > 4096 || !/^\/api\/[a-z/-]+$/.test(path))
+    if (
+      raw.length > 4096 ||
+      !/^\/api\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(path)
+    )
       return sendJson(res, 400, {
         state: 'invalid-request',
         message: 'Invalid API request.',
@@ -113,6 +120,8 @@ export function createVercelHandler({
       }
       if (await publicRead(req, res)) return;
       if (await environment(req, res)) return;
+      if (await cameras(req, res)) return;
+      if (await optional(req, res)) return;
       return sendJson(res, 503, {
         state: 'unavailable',
         message: 'This provider is not available in this deployment.',

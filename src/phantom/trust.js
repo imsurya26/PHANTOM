@@ -57,7 +57,7 @@ export function layerTrust(layer, now = Date.now()) {
     state = 'No results';
     explanation =
       'The source returned no records for this view. This does not establish that no activity exists.';
-  } else if (layer.enabled && feed === 'fallback') {
+  } else if (layer.enabled && feed === 'fallback' && state === 'Enabled') {
     state = 'Alternative source';
     explanation = 'An alternative source is in use; coverage may differ.';
   } else if (layer.enabled && feed === 'partial') {
@@ -77,6 +77,22 @@ export function layerTrust(layer, now = Date.now()) {
     state = 'Degraded';
     explanation =
       'Updates are delayed or incomplete. Previously retrieved data may still be shown.';
+  }
+  if (
+    layer.enabled &&
+    ['Enabled', 'Alternative source'].includes(state) &&
+    stats.count === 0
+  ) {
+    state = 'No results';
+    explanation =
+      'No records were returned for this view. Try another location or reload data; this is not worldwide coverage.';
+  }
+  if (
+    layer.enabled &&
+    typeof stats.coverage === 'string' &&
+    stats.coverage.length < 300
+  ) {
+    explanation += ` Coverage: ${stats.coverage}.`;
   }
   if (layer.id === 'local-adsb' && layer.enabled && status === 'idle') {
     state = 'Receiver required';

@@ -76,9 +76,7 @@ export function createLifecycle({
 
       const sources = await parts.catalog.loadCameraSources();
       const catalogFromSources = parts.catalog.buildCatalogFromSources(sources);
-      const catalog = catalogFromSources.length
-        ? catalogFromSources
-        : parts.catalog.seedCatalog();
+      const catalog = catalogFromSources;
 
       // Viewshed color identity (design §3a): golden-angle hue over the
       // id-SORTED catalog index — deterministic across sessions for a stable

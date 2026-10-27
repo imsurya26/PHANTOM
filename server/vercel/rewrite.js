@@ -3,7 +3,10 @@ export function restoreApiUrl(raw = '') {
   const url = new URL(raw, 'http://localhost');
   const routes = url.searchParams.getAll('__phantom_route');
   if (!routes.length) return raw;
-  if (routes.length !== 1 || !/^[a-z-]+(?:\/[a-z-]+)*$/.test(routes[0]))
+  if (
+    routes.length !== 1 ||
+    !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(routes[0])
+  )
     return '/invalid-api-path';
   url.searchParams.delete('__phantom_route');
   // Vercel also forwards the named source capture as `path`. It is routing

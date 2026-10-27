@@ -87,3 +87,19 @@ test('normalized stale and refresh failures cannot be presented as healthy', () 
     'Loading',
   );
 });
+
+test('fallback cannot hide failures and empty regional coverage is not a healthy live feed', () => {
+  assert.equal(
+    layerTrust({
+      enabled: true,
+      stats: { count: 0, fallback: true, unavailable: true },
+    }).state,
+    'Unavailable',
+  );
+  const empty = layerTrust({
+    enabled: true,
+    stats: { count: 0, fallback: true, coverage: 'within 250 nautical miles' },
+  });
+  assert.equal(empty.state, 'No results');
+  assert.match(empty.explanation, /250 nautical miles/);
+});

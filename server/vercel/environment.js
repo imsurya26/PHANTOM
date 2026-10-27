@@ -22,7 +22,7 @@ const FIRE_SOURCES = [
 const FIRE_TTL = 30 * 60_000;
 
 // Adapt Connect's mounted URL contract without mutating the caller's request.
-function mounted(plugin) {
+export function mounted(plugin) {
   let prefix, handle;
   plugin.configureServer({
     middlewares: {
@@ -50,11 +50,12 @@ function mounted(plugin) {
       if (body && Buffer.byteLength(body) > 4_000_000)
         return sendJson(res, 503, {
           error: 'image_too_large',
-          message: 'Choose a lower weather image resolution.',
+          message: 'The source response exceeds the deployment size limit.',
         });
       res.end(body);
     };
     response.once = (...args) => res.once?.(...args);
+    response.on = (...args) => res.on?.(...args);
     response.removeListener = (...args) => res.removeListener?.(...args);
     await handle(local, response);
     return true;

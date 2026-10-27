@@ -1,6 +1,7 @@
 import { layerTrust } from './trust.js';
 import { createSpecialistPanelHost } from './specialistPanel.js';
 import { enableLayerWithFeedback, layerActionMessage } from './layerAction.js';
+import { createDataReloader } from './dataReload.js';
 
 const sections = [
   'Explore',
@@ -44,6 +45,9 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   );
   const controller = new AbortController();
   const { signal } = controller;
+  const reloader = createDataReloader(dataManager);
+  let reloadRunning = false;
+  let reloadMessage = '';
   const root = document.createElement('div');
   root.id = 'phantom-shell';
   root.innerHTML = `<header class="phantom-header">
@@ -206,6 +210,38 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     });
   }
   function renderLayers() {
+    const reloadAll = action('Reload enabled data', async () => {
+      if (reloadRunning) return;
+      reloadRunning = true;
+      reloadAll.disabled = true;
+      const lifetime = drawerLifetime.signal;
+      try {
+        const results = await reloader.reloadEnabled({
+          signal,
+          report: (done, total) => {
+            reloadMessage = `Refreshing ${done} of ${total} layers…`;
+            if (!lifetime.aborted) reloadStatus.textContent = reloadMessage;
+          },
+        });
+        const failed = results.filter((result) => result.ok === false).length;
+        reloadMessage = results.length
+          ? `Reload finished: ${results.filter((result) => result.ok).length} refreshed, ${failed} need attention, ${results.filter((result) => result.skipped).length} recently refreshed. See each layer below. Provider caches and limits still apply.`
+          : 'No layers enabled. Choose a layer below first.';
+      } finally {
+        reloadRunning = false;
+        if (!lifetime.aborted) {
+          reloadAll.disabled = false;
+          reloadStatus.textContent = reloadMessage;
+          syncLayerCards();
+        }
+      }
+    });
+    reloadAll.disabled = reloadRunning;
+    const reloadStatus = text(
+      'p',
+      reloadRunning ? 'Reload in progress…' : reloadMessage,
+    );
+    reloadStatus.setAttribute('role', 'status');
     const groups = [
       [
         'Live Activity',
@@ -266,6 +302,23 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
         label.append(checkbox);
         text('small', '', card).className = 'phantom-layer-status';
         text('p', '', card).className = 'phantom-layer-explanation';
+        const retry = text('button', 'Reload data', card);
+        retry.type = 'button';
+        retry.dataset.reloadLayer = row.id;
+        retry.setAttribute('aria-label', `Reload ${row.name || row.id}`);
+        const retryStatus = text('small', '', card);
+        retryStatus.setAttribute('role', 'status');
+        retry.addEventListener(
+          'click',
+          async () => {
+            retry.disabled = true;
+            retryStatus.textContent = 'Requesting source data…';
+            const result = await reloader.reload(row.id, { signal });
+            retryStatus.textContent = result.message;
+            syncLayerCards();
+          },
+          { signal: drawerLifetime.signal },
+        );
         const details = text('details', '', card);
         text('summary', 'Source details', details);
         text('small', '', details).className = 'phantom-layer-source';
@@ -315,6 +368,10 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
         `${trust.source} · ${trust.freshness}. Fetch time is not observation time.`;
       const checkbox = card.querySelector('input');
       checkbox.checked = Boolean(row.enabled);
+      const retry = card.querySelector('[data-reload-layer]');
+      if (retry)
+        retry.disabled =
+          !row.enabled || Boolean(row.stats?.loading || row.stats?.refreshing);
     }
   }
   async function openVoice(trigger = document.activeElement) {

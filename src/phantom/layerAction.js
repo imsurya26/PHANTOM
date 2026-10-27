@@ -18,7 +18,12 @@ export async function enableLayerWithFeedback({
   };
   publish('Requesting source data…');
   try {
-    await dataManager.setEnabled(id, true, { origin: 'user' });
+    if (
+      dataManager.getAll?.().find((layer) => layer.id === id)?.enabled &&
+      dataManager.refreshLayer
+    )
+      await dataManager.refreshLayer(id, { signal });
+    else await dataManager.setEnabled(id, true, { origin: 'user' });
     publish(
       layerActionMessage(dataManager.getAll().find((layer) => layer.id === id)),
     );

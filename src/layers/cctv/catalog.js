@@ -89,7 +89,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
       return data.sources;
     } catch (error) {
       if (error?.name === 'AbortError') throw error;
-      return [];
+      throw new Error('Camera catalog unavailable. Retry this layer shortly.');
     }
   }
 
