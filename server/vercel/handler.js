@@ -6,6 +6,7 @@ import { createPublicReadHandler } from './public-read.js';
 import { createEnvironmentHandler } from './environment.js';
 import { createCameraHandler } from './cameras.js';
 import { createOptionalReadHandler } from './optional.js';
+import { createTrafficHandler } from './traffic.js';
 
 function middleware(plugin) {
   let handler;
@@ -29,6 +30,11 @@ export function createVercelHandler({
   const publicRead = createPublicReadHandler({ fetchImpl, now });
   const cameras = createCameraHandler({ env, fetchImpl, now });
   const optional = createOptionalReadHandler({ fetchImpl, now });
+  const traffic = createTrafficHandler({
+    env,
+    fetchImpl: admission.trafficFetch,
+    now,
+  });
   const environment = createEnvironmentHandler({
     env,
     fetchImpl,
@@ -62,7 +68,7 @@ export function createVercelHandler({
     const path = raw.split('?')[0];
     if (
       raw.length > 4096 ||
-      !/^\/api\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(path)
+      !/^\/api\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\.(?:pbf|bin))?$/.test(path)
     )
       return sendJson(res, 400, {
         state: 'invalid-request',
@@ -122,6 +128,7 @@ export function createVercelHandler({
       if (await environment(req, res)) return;
       if (await cameras(req, res)) return;
       if (await optional(req, res)) return;
+      if (await traffic(req, res)) return;
       return sendJson(res, 503, {
         state: 'unavailable',
         message: 'This provider is not available in this deployment.',

@@ -6,6 +6,7 @@ import { cycloneProxy } from '../providers/cyclones.js';
 import { radioBrowserProxy } from '../providers/radio.js';
 import { windProxy } from '../providers/wind.js';
 import { militaryInstallationsProxy } from '../providers/military-installations.js';
+import { installRouteMiddleware } from '../providers/places/routes.js';
 import { sendJson } from './admission.js';
 
 /** Validated, bounded public read services; no arbitrary upstream URLs. */
@@ -14,6 +15,13 @@ export function createOptionalReadHandler({
   now = Date.now,
 } = {}) {
   const handlers = new Map([
+    [
+      '/api/route',
+      mounted({
+        configureServer: ({ middlewares }) =>
+          installRouteMiddleware(middlewares, { fetchImpl }),
+      }),
+    ],
     ['/api/launches', mounted(rocketLaunchesProxy())],
     ['/api/gbfs', mounted(gbfsProxy())],
     ['/api/transit', mounted(transitProxy({ fetchImpl }))],

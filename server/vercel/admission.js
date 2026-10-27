@@ -108,6 +108,17 @@ export function createPublicAdmission({
       if (!result.allowed) throw new Error('Fire data usage limit reached');
       return fetchImpl(url, options);
     },
+    async trafficFetch(url, options) {
+      const result = await reserve([
+        ['tomtom:upstream:hour', 300, 3600000],
+        ['tomtom:upstream:day', 3000, 86400000],
+      ]);
+      if (!result.allowed)
+        throw Object.assign(new Error('Traffic allowance reached'), {
+          status: 429,
+        });
+      return fetchImpl(url, options);
+    },
     async openaqFetch(url, options) {
       // Count each real upstream call, including fan-out, independently of caches.
       const result = await reserve([

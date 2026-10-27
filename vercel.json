@@ -9,6 +9,7 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60,
+      "includeFiles": "node_modules/@meri-imperiumi/eccodes-wasm/{wasm,build}/**",
       "excludeFiles": "{.env*,.git/**,.agents/**,.codex/**,qa-artifacts/**,qa-shots/**,**/*.test.mjs}"
     }
   },

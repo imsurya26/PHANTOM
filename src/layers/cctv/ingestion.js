@@ -33,7 +33,9 @@ export function createIngestion({
         // exists, so this latch effectively fires for the google-3d regime —
         // terrain-globe records resolve from the prior in their drain pass.
         const unresolved = layerState._records.filter(
-          (record) => !parts.ground.isGroundResolved(record),
+          (record) =>
+            (record.geometryPrepared || record.activationDone) &&
+            !parts.ground.isGroundResolved(record),
         );
         if (unresolved.length)
           parts.geometryQueue.enqueueGeometryRefresh(unresolved);

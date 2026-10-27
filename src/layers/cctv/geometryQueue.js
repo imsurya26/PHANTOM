@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+export const INITIAL_CCTV_GEOMETRY_LIMIT = 64;
 import {
   GEO_PROGRESS_NOTIFY_INTERVAL_MS,
   GEO_PROGRESS_NOTIFY_BATCH_LIMIT,
@@ -215,6 +216,7 @@ export function createGeometryQueue({
           document.body?.classList.contains('cockpit-mode'),
       }),
       visit: (record) => {
+        record.geometryPrepared = true;
         try {
           parts.geometry.updateRecordGeometry(record);
         } catch (err) {
@@ -315,6 +317,9 @@ export function createGeometryQueue({
         ),
       }))
       .sort((a, b) => a.distKm - b.distKm)
+      // Catalog markers already have ground priors. Refine a bounded nearby
+      // set now; explicit camera selection grounds every other record lazily.
+      .slice(0, INITIAL_CCTV_GEOMETRY_LIMIT - (active ? 1 : 0))
       .map((entry) => entry.record);
     layerState._geoQueue = active ? [active, ...pending] : pending;
     layerState._geoLoadTotal = layerState._geoQueue.length;

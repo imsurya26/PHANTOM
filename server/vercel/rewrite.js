@@ -5,7 +5,7 @@ export function restoreApiUrl(raw = '') {
   if (!routes.length) return raw;
   if (
     routes.length !== 1 ||
-    !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(routes[0])
+    !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\.(?:pbf|bin))?$/.test(routes[0])
   )
     return '/invalid-api-path';
   url.searchParams.delete('__phantom_route');
