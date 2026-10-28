@@ -223,8 +223,15 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
           },
         });
         const failed = results.filter((result) => result.ok === false).length;
+        const failedNames = results
+          .filter((result) => result.ok === false)
+          .map(
+            (result) =>
+              dataManager.getAll().find((row) => row.id === result.id)?.name ||
+              result.id,
+          );
         reloadMessage = results.length
-          ? `Reload finished: ${results.filter((result) => result.ok).length} refreshed, ${failed} need attention, ${results.filter((result) => result.skipped).length} recently refreshed. See each layer below. Provider caches and limits still apply.`
+          ? `Reload finished: ${results.filter((result) => result.ok).length} refreshed, ${failed} need attention${failedNames.length ? ` (${failedNames.join(', ')})` : ''}, ${results.filter((result) => result.skipped).length} recently refreshed. See each layer below. Provider caches and limits still apply.`
           : 'No layers enabled. Choose a layer below first.';
       } finally {
         reloadRunning = false;

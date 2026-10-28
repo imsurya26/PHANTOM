@@ -78,6 +78,7 @@ test('normalized stale and refresh failures cannot be presented as healthy', () 
   for (const stats of [
     { status: 'stale' },
     { count: 3, managerRefreshError: 'refresh failed' },
+    { count: 3, fallback: true, managerRefreshError: 'refresh failed' },
   ]) {
     assert.equal(layerTrust({ enabled: true, stats }).state, 'Degraded');
   }

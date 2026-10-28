@@ -25,7 +25,13 @@ export function layerTrust(layer, now = Date.now()) {
       ['unavailable', 'offline', 'error'].includes(stats.status)
     )
       state = 'Unavailable';
-    else if (stats.stale || stats.degraded || stats.lastError || stats.error)
+    else if (
+      stats.stale ||
+      stats.degraded ||
+      stats.lastError ||
+      stats.error ||
+      stats.managerRefreshError
+    )
       state = 'Degraded';
     else state = 'Enabled';
   }
