@@ -436,11 +436,11 @@ export function createTracking({ state: layerState, services, parts, source }) {
     layerState._trackedEntity = layerState._viewer.entities.add({
       position: positionProperty,
       viewFrom,
-      point: {
-        pixelSize: 14,
+      billboard: {
+        image: SATELLITE_ICON,
+        width: 32,
+        height: 32,
         color: Cesium.Color.YELLOW,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
     });
@@ -477,3 +477,4 @@ export function createTracking({ state: layerState, services, parts, source }) {
     _trackSatellite,
   };
 }
+import { SATELLITE_ICON } from './icon.js';

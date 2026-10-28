@@ -125,6 +125,7 @@ export function createCatalog({ state: layerState, services, parts, source }) {
             group: 'dense',
           });
           const point = layerState._pointCollection.add({
+            ...satelliteIconOptions(style, { dense: true }),
             position: Cesium.Cartesian3.fromDegrees(
               pos.longitude,
               pos.latitude,
@@ -240,3 +241,4 @@ export function createCatalog({ state: layerState, services, parts, source }) {
     _removeDenseCatalog,
   };
 }
+import { satelliteIconOptions } from './icon.js';

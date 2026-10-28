@@ -50,8 +50,8 @@ export const SEQUENCE_VIEW_RANGE_PER_HEIGHT = 10;
 /** Ground always covered around the camera at street zooms, in metres. */
 export const SEQUENCE_VIEW_NEAR_M = 1_000;
 export const COVERAGE_OVERVIEW_POINT_PX = 2.5;
-export const COVERAGE_MAX_SEQUENCES = 6000;
-export const COVERAGE_LINE_WIDTH_PX = 2.5;
+export const COVERAGE_MAX_SEQUENCES = 1200;
+export const COVERAGE_LINE_WIDTH_PX = 1.5;
 
 /** Per-sequence image cones after a sequence is selected. */
 export const SEQUENCE_IMAGES_LIMIT = 2000;

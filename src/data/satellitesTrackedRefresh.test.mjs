@@ -295,7 +295,9 @@ test('ISS ambient and tracked lifecycle uses cached host entries with no native 
     assert.ok(trackedEntity);
     assert.equal(viewer.entities.values.length, 1, 'runtime guard requires a real tracked entity');
     assert.equal(trackedEntity.label, undefined);
-    assert.ok(trackedEntity.point, 'tracked dot remains on the entity for camera framing');
+    assert.ok(trackedEntity.billboard?.image, 'tracked satellite uses an image symbol for camera framing');
+    assert.equal(trackedEntity.billboard.width.getValue(), 32);
+    assert.equal(trackedEntity.point, undefined, 'no duplicate dot behind the symbol');
     const trackedEntry = createTrackedOverlayEntry(trackedEntity);
     assert.ok(trackedEntry);
     assert.equal(trackedEntry.id, 'satellites:25544');

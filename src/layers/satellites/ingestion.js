@@ -133,6 +133,7 @@ export function createIngestion({
           // Add point primitive (styling from the shared table, WS-D3)
           const style = parts.controls._pointStyleFor(noradId, entry.group);
           const point = layerState._pointCollection.add({
+            ...satelliteIconOptions(style),
             position: cartesian,
             pixelSize: style.pixelSize,
             color: style.color,
@@ -193,3 +194,4 @@ export function createIngestion({
 
   return { methods };
 }
+import { satelliteIconOptions } from './icon.js';

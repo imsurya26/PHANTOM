@@ -46,8 +46,8 @@ export function createLifecycle({
       layerState._denseError = null;
       layerState._catalogRevision++;
 
-      // Point primitives for satellite dots
-      layerState._pointCollection = new Cesium.PointPrimitiveCollection();
+      // Batched symbols share one atlas texture instead of individual models.
+      layerState._pointCollection = new Cesium.BillboardCollection();
       viewer.scene.primitives.add(layerState._pointCollection);
 
       parts.interaction._installClickHandler(viewer);

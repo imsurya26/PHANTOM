@@ -177,7 +177,7 @@ test('a superseded tile request cannot strand lines on the globe', async () => {
 
   coverage.refresh(); // street zoom: request #1 for the tile
   assert.equal(forTile().length, 1);
-  viewer.view.height = 100_000; // zoom out: retire() drops request #1
+  viewer.view.height = 10_000; // zoom out: retire() drops request #1
   coverage.refresh();
   viewer.view.height = 900; // back in before #1 settles: request #2
   coverage.refresh();
@@ -291,19 +291,6 @@ test('panning off a tile that is still loading stops counting it as loading', as
   coverage.clear();
 });
 
-test('zoom 0 is a zoom: the whole-earth view still shows coverage', () => {
-  const { viewer, source, state, coverage } = setup();
-  viewer.view.height = 20_000_000;
-  coverage.refresh();
-  assert.equal(state.coverage.zoom, 0);
-  assert.equal(state.coverage.hint, '');
-  assert.deepEqual(
-    source.calls.map((call) => call.key),
-    ['0/0/0'],
-  );
-  coverage.clear();
-});
-
 test('a rejected key stops coverage requests until the layer goes off', async () => {
   const { viewer, source, state, coverage } = setup();
   coverage.refresh();
@@ -351,44 +338,25 @@ test('a rate limit keeps the drawn tiles and asks again once the wait is over', 
   coverage.resetErrors();
 });
 
-test('overview points behind the horizon are hidden, not drawn through the globe', async () => {
-  const { viewer, source, state, coverage } = setup();
-  const { view } = viewer;
-  view.height = 20_000_000;
-  Object.defineProperty(viewer.camera, 'positionWC', {
-    get: () => Cesium.Cartesian3.fromDegrees(view.lon, view.lat, view.height),
-  });
+test('zoomed-out coverage makes no requests or green dots and clears pending street work', async () => {
+  const { viewer, source, state, coverage, bytes, onGlobe } = setup();
+  viewer.view.height = 600_000;
   coverage.refresh();
-  // One dot under the camera (Sacramento), one near its antipode.
-  source.calls[0].resolve(
-    encodeCoverageTile(
-      { x: 0, y: 0, z: 0 },
-      {
-        overview: [
-          { id: 'near', lon: -121.5, lat: 38.6 },
-          { id: 'far', lon: 58.5, lat: -38.6 },
-        ],
-      },
-    ),
-  );
+  assert.equal(source.calls.length, 0, 'regional view must not fetch overview dots');
+  assert.equal(onGlobe(), 0);
+  assert.match(state.coverage.hint, /Zoom in/);
+  viewer.view.height = 900;
+  coverage.refresh();
+  assert.ok(source.calls.length > 0, 'nearby street coverage still loads');
+  const pending = source.calls[0];
+  viewer.view.height = 600_000;
+  coverage.refresh();
+  assert.equal(pending.signal.aborted, true);
+  pending.resolve(bytes);
   await settle();
-  const [entry] = state.coverage.tiles.values();
-  const points = [0, 1].map((i) => entry.primitive.get(i));
-  const west = (point) =>
-    Cesium.Cartographic.fromCartesian(point.position).longitude < 0;
-  const near = points.find(west);
-  const far = points.find((point) => !west(point));
-  frame(viewer.preRender);
-  assert.equal(near.show, true, 'the near side stays visible');
-  assert.equal(far.show, false, 'the far side does not show through');
-  // Fly round to the other hemisphere: the two swap.
-  view.lon = 58.5;
-  view.lat = -38.6;
-  frame(viewer.preRender);
-  assert.equal(near.show, false);
-  assert.equal(far.show, true);
+  assert.equal(onGlobe(), 0, 'late responses cannot restore distant green coverage');
+  assert.equal(state.coverage.pending.size, 0);
   coverage.clear();
-  assert.equal(viewer.preRender.size, 0, 'the cull listener is gone');
 });
 
 test('a cast tile whose heights were evicted is cast again, not left draped', async () => {
@@ -506,7 +474,7 @@ test('the per-tile cap applies after the imagery filter, so a dense tile keeps i
   assert.equal(entry.count, Math.min(300, cap), 'every 360° line is drawn');
   assert.equal(coverage.sequenceCount(), Math.min(300, cap));
   // Picking and recolouring look sequences up among the drawn lines.
-  assert.ok(entry.sequences.has('pano-0'), 'drawn lines can be looked up');
+  assert.ok(entry.sequences.has('pano-299'), 'drawn lines can be looked up');
   assert.equal(entry.sequences.has('flat-699'), false);
   state.context.filter = { pano: 'all', sinceMs: null };
   coverage.rebuild();
@@ -742,7 +710,7 @@ test('a selection cleared while the old zoom is still shown uncolours its lines'
   coverage.recolorSequence('seq-1', true);
   assert.deepEqual(Array.from(line.attributes.color), colourValue(true));
   // Zoom out: the street tile stays on screen while the new zoom loads...
-  viewer.view.height = 100_000;
+  viewer.view.height = 10_000;
   coverage.refresh();
   assert.equal(state.coverage.stale.size, 1, 'the old zoom is kept');
   // ...and the selection is cleared meanwhile.
@@ -763,7 +731,7 @@ test('a selection made while the old zoom is still building is applied once it i
   await settle();
   const [entry] = state.coverage.tiles.values();
   const line = controlled(entry.primitives[0], false);
-  viewer.view.height = 100_000;
+  viewer.view.height = 10_000;
   coverage.refresh();
   assert.equal(state.coverage.stale.size, 1);
   frame(viewer.postRender);

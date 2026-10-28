@@ -666,6 +666,15 @@ export function createCoverage({ state, source }) {
     const height = Number.isFinite(cameraHeight)
       ? cameraHeight - (ground ?? 0)
       : null;
+    // Coverage is a local navigation aid, not a global field of markers.
+    // Drop both visible geometry and pending work when leaving street scale.
+    if (height == null || height > 20_000) {
+      clear();
+      state.coverage.lastError = null;
+      state.coverage.hint = 'Zoom in below 20 km to explore street imagery';
+      notify();
+      return;
+    }
     const sequenceZoom = coverageZoomForHeight(height);
     const overviewZoom = sequenceZoom ? null : overviewZoomForHeight(height);
     const zoom = sequenceZoom ?? overviewZoom;
