@@ -2,6 +2,7 @@ import { layerTrust } from './trust.js';
 import { createSpecialistPanelHost } from './specialistPanel.js';
 import { enableLayerWithFeedback, layerActionMessage } from './layerAction.js';
 import { createDataReloader } from './dataReload.js';
+import { mountReactiveTheme } from './reactiveTheme.js';
 
 const sections = [
   'Explore',
@@ -59,13 +60,14 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   <nav class="phantom-nav" aria-label="Main navigation">${sections.map(navButton).join('')}</nav>
   <nav class="phantom-mobile-nav" aria-label="Mobile navigation">${['Explore', 'Layers', 'Events', 'Nexus', 'More'].map(navButton).join('')}</nav>
   <section id="phantom-drawer" class="phantom-drawer" aria-labelledby="phantom-section-title" hidden>
-    <header><h2 id="phantom-section-title"></h2><button type="button" class="phantom-close" aria-label="Close panel">×</button></header>
+    <header class="phantom-drawer-header"><h2 id="phantom-section-title"></h2><button type="button" class="phantom-close" aria-label="Close panel">×</button></header>
     <div class="phantom-content"></div>
   </section>
   <div class="phantom-connectivity" role="status" hidden></div>
   <footer class="phantom-footer"><span>Latest available observations · coverage varies</span><span class="phantom-feed-count" role="status"></span></footer>`;
   document.body.append(root);
   document.body.classList.add('phantom');
+  mountReactiveTheme(root, { signal });
   // Saved legacy panel positions must not leak into the product workspace.
   document.body.classList.remove('phantom-advanced');
   const specialist = createSpecialistPanelHost({

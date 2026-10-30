@@ -1,37 +1,55 @@
-/* PHANTOM: restrained cartography. Product tokens also theme existing controls. */
+/* Midnight / electric blue / cantaloupe. Tokens also theme retained controls. */
 body.phantom {
-  --bg-dark: #10191d;
-  --glass-bg: #172328;
-  --menu-bg: #172328;
-  --glass-border: #3b4b50;
-  --glass-border-hover: #788d94;
-  --accent: #b5d9c8;
-  --accent-dim: #29453d;
+  color-scheme: dark;
+  --bg-dark: #060a12;
+  --glass-bg: #0c1422;
+  --menu-bg: #0c1422;
+  --glass-border: #30435e;
+  --glass-border-hover: #609fff;
+  --accent: #69a7ff;
+  --accent-dim: #152e50;
   --accent-glow: transparent;
-  --text-primary: #edf2f0;
-  --text-secondary: #bac7c9;
-  --text-dim: #a2b2b6;
-  --panel-radius: 8px;
-  --btn-radius: 5px;
+  --text-primary: #f2f6ff;
+  --text-secondary: #bac9df;
+  --text-dim: #98abc6;
+  --panel-radius: 12px;
+  --btn-radius: 8px;
   --left-stack-x: 126px;
   --left-stack-top: 90px;
   --right-rail-x: 20px;
-  --phantom-surface: #172328;
-  --phantom-border: #3b4b50;
+  --phantom-surface: #0c1422;
+  --phantom-border: #30435e;
+  --phantom-orange: #ffb17a;
+  --phantom-orange-dim: #35251f;
+  --phantom-raised: #111f33;
+  --phantom-glow: #3985ff24;
+  --cyber-red: var(--phantom-orange);
+  --cyber-red-bright: var(--phantom-orange);
+  --cyber-slate: var(--phantom-surface);
+  --cyber-slate-raised: var(--phantom-raised);
+  --cyber-telemetry-fill: var(--bg-dark);
+  --cyber-panel-surface: var(--phantom-surface);
+  --cyber-panel-surface-detail: none;
+  --cyber-panel-shadow: 0 8px 28px #02050c66;
 }
 body.phantom-light {
-  --bg-dark: #e9eeea;
-  --glass-bg: #f6f8f4;
-  --menu-bg: #f6f8f4;
-  --glass-border: #a9b9b3;
-  --glass-border-hover: #586f65;
-  --accent: #235948;
-  --accent-dim: #dce9e0;
-  --text-primary: #1c302b;
-  --text-secondary: #455e55;
-  --text-dim: #51695f;
-  --phantom-surface: #f6f8f4;
-  --phantom-border: #a9b9b3;
+  color-scheme: light;
+  --bg-dark: #eaf0fa;
+  --glass-bg: #f8faff;
+  --menu-bg: #f8faff;
+  --glass-border: #9aaec9;
+  --glass-border-hover: #235ec2;
+  --accent: #215cb8;
+  --accent-dim: #dfebff;
+  --text-primary: #101e34;
+  --text-secondary: #394e6c;
+  --text-dim: #4b6080;
+  --phantom-surface: #f8faff;
+  --phantom-border: #9aaec9;
+  --phantom-orange: #94420c;
+  --phantom-orange-dim: #ffeadb;
+  --phantom-raised: #edf3ff;
+  --phantom-glow: #3985ff18;
 }
 .phantom #title-bar,
 .phantom .title-glow,
@@ -377,7 +395,7 @@ body.phantom #phantom-shell .phantom-specialist-body > .phantom-revealed {
   letter-spacing: 0.02em;
 }
 .phantom #loading-screen {
-  background: #10191d;
+  background: var(--bg-dark);
 }
 .phantom .loader-logo {
   width: 55px;
@@ -590,7 +608,7 @@ body.phantom .phantom-gemini-control p {
   margin: 0;
 }
 body.phantom .phantom-tour-target {
-  outline: 2px solid #72dbc4;
+  outline: 2px solid var(--phantom-orange);
   outline-offset: 4px;
 }
 body.phantom #cesiumContainer.phantom-tour-target {
@@ -668,6 +686,126 @@ body.phantom {
   font-weight: 400;
   display: flex;
   align-items: center;
+}
+/* Magic UI Magic Card spotlight pattern, adapted to the vanilla shell.
+   Pointer coordinates are updated on demand; no perpetual animation loop. */
+.phantom-nav,
+.phantom-mobile-nav,
+.phantom-drawer-header {
+  isolation: isolate;
+}
+.phantom-drawer-header {
+  position: relative;
+}
+.phantom-nav::before,
+.phantom-mobile-nav::before,
+.phantom-drawer-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    180px circle at var(--pointer-x, -200px) var(--pointer-y, -200px),
+    var(--phantom-glow),
+    transparent 100%
+  );
+  transition: opacity 160ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  #phantom-shell [data-reactive-active]::before {
+    opacity: 1;
+  }
+  #phantom-shell .phantom-nav button:hover svg,
+  #phantom-shell .phantom-mobile-nav button:hover svg {
+    transform: translateY(-2px);
+  }
+}
+.phantom-header {
+  background: var(--bg-dark);
+  box-shadow: 0 1px 0 #69a7ff0d;
+}
+.phantom-brand img {
+  border-radius: 8px;
+}
+.phantom-drawer,
+.phantom-specialist,
+.phantom-search-results {
+  border-radius: var(--panel-radius);
+  box-shadow: 0 16px 44px #02050c66;
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border-hover) var(--bg-dark);
+  overscroll-behavior: contain;
+}
+.phantom-drawer > header {
+  border-top: 2px solid var(--phantom-orange);
+}
+.phantom-drawer h2 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.phantom-content h3 {
+  color: var(--phantom-orange);
+  letter-spacing: 0.01em;
+}
+#phantom-shell button,
+#phantom-shell select,
+.phantom-content input,
+.phantom .phantom-search #location-search {
+  border-radius: var(--btn-radius);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+#phantom-shell button:not(:disabled):hover {
+  border-color: var(--glass-border-hover);
+  background-color: var(--accent-dim);
+}
+#phantom-shell button:not(:disabled):active {
+  background-color: var(--phantom-raised);
+}
+#phantom-shell .phantom-nav button,
+#phantom-shell .phantom-mobile-nav button {
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+#phantom-shell .phantom-nav button svg,
+#phantom-shell .phantom-mobile-nav button svg {
+  transition: transform 150ms ease;
+}
+#phantom-shell nav button[aria-expanded='true'] {
+  color: var(--phantom-orange);
+  background-color: var(--phantom-orange-dim);
+  border-color: var(--phantom-orange);
+}
+#phantom-shell .phantom-status {
+  color: var(--phantom-orange);
+  border-color: var(--phantom-orange);
+  background: var(--phantom-orange-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.phantom-layer-card {
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+.phantom-layer-card:focus-within {
+  background-color: var(--phantom-raised);
+}
+.phantom-content summary::marker {
+  color: var(--phantom-orange);
+}
+.phantom-content input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+.phantom-footer {
+  background-color: var(--bg-dark);
+  font-variant-numeric: tabular-nums;
 }
 .phantom-map-select {
   display: block;
