@@ -209,7 +209,7 @@ h1 em {
 .globe g[clip-path] {
   stroke: var(--landing-blue);
 }
-.globe g[fill] {
+.globe g[fill]:not([fill='none']) {
   fill: var(--landing-orange);
 }
 .globe span {
