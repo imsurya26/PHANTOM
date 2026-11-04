@@ -84,8 +84,14 @@ export function createGateway({
       ['tomtom', /^\/api\/tomtom(?:[/.]|$)/i],
       ['google-places', /^\/api\/google(?:[/.]|$)/i],
       ['mapillary', /^\/api\/mapillary(?:[/.]|$)/i],
+      ['noaa', /^\/api\/(?:weather|wind|cyclones)(?:[/.]|$)/i],
     ].find(([, pattern]) => pattern.test(path))?.[0];
-    if (routeProvider && providerStatus?.disabled(routeProvider))
+    if (
+      (routeProvider && providerStatus?.disabled(routeProvider)) ||
+      (path === '/api/phantom/signals' &&
+        (providerStatus?.disabled('gdelt') ||
+          providerStatus?.disabled('wikimedia')))
+    )
       return send(
         503,
         'provider_disabled',

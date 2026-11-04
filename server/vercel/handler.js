@@ -68,13 +68,36 @@ export function createVercelHandler({
     const path = raw.split('?')[0];
     if (
       raw.length > 4096 ||
-      !/^\/api\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\.(?:pbf|bin))?$/.test(path)
+      !/^\/api\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*(?:\.(?:pbf|bin))?$/.test(
+        path,
+      )
     )
       return sendJson(res, 400, {
         state: 'invalid-request',
         message: 'Invalid API request.',
       });
     try {
+      const routeProvider =
+        {
+          'air-quality': 'openaq',
+          flights: 'adsb-lol',
+          military: 'adsb-lol',
+          geocode: 'photon',
+          wind: 'noaa',
+          weather: 'noaa',
+          cyclones: 'noaa',
+          vessels: 'aisstream',
+          google: 'google-places',
+        }[path.split('/')[2]] || path.split('/')[2];
+      if (
+        status.disabled(routeProvider) ||
+        (path === '/api/phantom/signals' &&
+          (status.disabled('gdelt') || status.disabled('wikimedia')))
+      )
+        return sendJson(res, 503, {
+          state: 'disabled',
+          message: 'This provider is disabled.',
+        });
       if (
         ['/api/providers/status', '/api/phantom/provider-status'].includes(
           path,
@@ -94,6 +117,11 @@ export function createVercelHandler({
               'usgs',
               'celestrak',
               'firms',
+              'tomtom',
+              'mapillary',
+              'noaa',
+              'gdelt',
+              'wikimedia',
             ].includes(provider.id)
           )
             return provider;
