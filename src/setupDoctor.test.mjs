@@ -273,7 +273,7 @@ test('doctor describes the credential ladder without exposing values', () => {
     /Google Photorealistic 3D Tiles through Cesium ion/,
   );
   assert.match(capabilities.map, /Bing and world-terrain stacks/);
-  assert.equal(capabilities.voice, 'available');
+  assert.equal(capabilities.voice, 'Legacy OpenAI credentials present; access not verified');
   assert.equal(
     buildCapabilitySummary({
       ...credentials,

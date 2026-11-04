@@ -16,6 +16,8 @@ export const CREDENTIALS = Object.freeze([
   { name: 'GOOGLE_MAPS_SERVER_API_KEY', label: 'Google Places / Street View server', keychain: [] },
   { name: 'CESIUM_ION_TOKEN', label: 'Cesium ion', keychain: [['cesium-ion', 'token']] },
   { name: 'OPENAI_API_KEY', label: 'OpenAI voice', keychain: [['openai-api', 'api-key']] },
+  { name: 'GEMINI_API_KEY', label: 'PHANTOM Gemini voice', keychain: [] },
+  { name: 'OPENAQ_API_KEY', label: 'OpenAQ air quality', keychain: [] },
   { name: 'AISSTREAM_API_KEY', label: 'AISStream vessels', keychain: [['aisstream-api', 'api-key']] },
   { name: 'FIRMS_MAP_KEY', label: 'NASA FIRMS fires', keychain: [['firms-map', 'map-key']] },
   { name: 'TOMTOM_API_KEY', label: 'TomTom traffic', keychain: [['tomtom-api', 'api-key']] },
@@ -176,12 +178,15 @@ export function buildCapabilitySummary(
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
         : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
     flights,
-    voice: configured('OPENAI_API_KEY')
-      ? 'available'
+    voice: configured('GEMINI_API_KEY')
+      ? 'Gemini credentials present; voice access and public usage storage must be verified'
+      : configured('OPENAI_API_KEY')
+      ? 'Legacy OpenAI credentials present; access not verified'
       : 'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
-    vessels: configured('AISSTREAM_API_KEY') ? 'live AISStream feed' : 'off until an AISStream key is added',
-    fires: configured('FIRMS_MAP_KEY') ? 'live NASA FIRMS feed' : 'off until a FIRMS key is added',
-    traffic: configured('TOMTOM_API_KEY') ? 'live TomTom flow' : 'built-in traffic simulation',
+    vessels: configured('AISSTREAM_API_KEY') ? 'AISStream credentials present; requires a running collector and verified observations' : 'off until an AISStream key and collector are configured',
+    fires: configured('FIRMS_MAP_KEY') ? 'NASA FIRMS credentials present; access and freshness not verified' : 'off until a FIRMS key is added',
+    traffic: configured('TOMTOM_API_KEY') ? 'TomTom credentials present; flow coverage not verified' : 'OSM reference roads; no measured live traffic',
+    airQuality: configured('OPENAQ_API_KEY') ? 'OpenAQ credentials present; station coverage and access not verified' : 'off until an OpenAQ key is configured',
     missions: configured('LL2_API_TOKEN')
       ? 'Launch Library 2 token allowance'
       : 'Launch Library 2 public access',
@@ -243,7 +248,7 @@ export function formatSetupReport(report, { readyMessage } = {}) {
     '',
     'Configured providers:',
     ...CREDENTIALS.map((spec) => {
-      const state = report.credentials[spec.name];
+      const state = report.credentials[spec.name] || { configured: false };
       return state.configured
         ? `  [OK] ${spec.label} (${state.source})`
         : `  [--] ${spec.label}`;

@@ -412,7 +412,12 @@ export function createStreetLevelLayer({
       else if (coverage.hint && state.enabled) loadingLabel = coverage.hint;
       return {
         count: coverage.count,
-        status: !coverage.keyRequired && !coverage.error && coverage.hint?.startsWith('Zoom in') ? 'zoom-in' : undefined,
+        status:
+          !coverage.keyRequired &&
+          !coverage.error &&
+          coverage.hint?.startsWith('Zoom in')
+            ? 'zoom-in'
+            : undefined,
         loading: coverage.loading,
         keyRequired: coverage.keyRequired,
         error: coverage.keyRequired

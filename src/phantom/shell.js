@@ -3,6 +3,7 @@ import { createSpecialistPanelHost } from './specialistPanel.js';
 import { enableLayerWithFeedback, layerActionMessage } from './layerAction.js';
 import { createDataReloader } from './dataReload.js';
 import { mountReactiveTheme } from './reactiveTheme.js';
+import { createObjectCameraModes } from '../ui/objectCameraModes.js';
 
 const sections = [
   'Explore',
@@ -40,7 +41,11 @@ const navButton = (name) =>
   `<button type="button" data-section="${name}" aria-controls="phantom-drawer" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${navIcons[name]}</svg><span>${name}</span></button>`;
 
 /** Thin product shell: existing controllers remain the sole state authority. */
-export function mountPhantomShell({ styleManager, dataManager, viewer }) {
+export function mountPhantomShell({
+  styleManager,
+  dataManager,
+  viewer = styleManager.viewer,
+}) {
   const openedWithSharedState = Boolean(
     styleManager.hasShareState || location.hash,
   );
@@ -49,6 +54,32 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   const reloader = createDataReloader(dataManager);
   let reloadRunning = false;
   let reloadMessage = '';
+  let selectedFlightLayer = 'flights';
+  const cameraModes = createObjectCameraModes({
+    viewer,
+    navigation: styleManager._navigation,
+    readFirstPersonTarget: () =>
+      dataManager.layers
+        .get('ais-live-vessels')
+        ?.module.getSelectedCameraTarget?.(),
+    readHeading: (entity) => {
+      const layerId = String(entity?.gevTrackedId || '').split(':')[0];
+      if (!['flights', 'military'].includes(layerId)) return null;
+      const track = dataManager.layers
+        .get(layerId)
+        ?.module.getTrackedHeading?.();
+      return Number.isFinite(track) && track >= 0 && track <= 360
+        ? track
+        : null;
+    },
+    cockpit: {
+      state: () => styleManager.getCockpitState(),
+      enter: () => styleManager.controlCockpit('enter'),
+      exit: () => styleManager.controlCockpit('exit'),
+    },
+    reducedMotion: () =>
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  });
   const root = document.createElement('div');
   root.id = 'phantom-shell';
   root.innerHTML = `<header class="phantom-header">
@@ -473,6 +504,9 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
         signals: () => import('./signalsPanel.js'),
         airQuality: () => import('./airQualityPanel.js'),
         nexus: () => import('./nexusPanel.js'),
+        radio: () => import('./radioPanel.js'),
+        flight: () => import('./flightDetails.js'),
+        camera: () => import('./cameraPanel.js'),
       };
       const module = await loaders[path]();
       if (!lifetime.aborted)
@@ -573,7 +607,55 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
       );
       layerAction('Show data centers', 'local-datacenters');
       layerAction('Show dams', 'local-dams');
+      layerAction(
+        'Show submarine cables and landing points',
+        'telegeography-submarine-cables',
+      );
+      text(
+        'small',
+        'Submarine cable routes: TeleGeography. Select a route or landing point for source details; mapped routes do not indicate live network traffic.',
+      );
       action('All infrastructure layers', () => revealPanel('data-panel'));
+    } else if (section === 'Camera views') {
+      lazyPanel('camera', 'mountCameraPanel', { cameraModes });
+    } else if (section === 'Flight details') {
+      lazyPanel('flight', 'mountFlightDetails', {
+        dataManager,
+        layerId: selectedFlightLayer,
+      });
+      action('Aircraft cockpit', () => {
+        const result = styleManager.controlCockpit('enter');
+        if (result?.ok) close(false);
+        else
+          text(
+            'p',
+            result?.error ||
+              'Select a supported aircraft and open Contacts first.',
+          );
+      });
+      action('Camera views', () => open('Camera views', returnFocus));
+      action('Return to free camera', () => {
+        styleManager.controlCockpit('exit');
+        styleManager._runExplicitNavigation(
+          'free camera',
+          () => {
+            viewer.scene.requestRender();
+            return true;
+          },
+          { trackingOrigin: 'user' },
+        );
+        close(false);
+      });
+    } else if (section === 'Radio') {
+      layerAction('Enable radio directory', 'radio');
+      lazyPanel('radio', 'mountRadioPanel', { dataManager });
+    } else if (section === 'Cameras') {
+      text(
+        'p',
+        'Browse public cameras. Sources may provide snapshots, recorded clips or live video; check each camera’s media status before viewing.',
+      );
+      layerAction('Show public cameras', 'cctv');
+      action('Open camera controls', () => revealPanel('cctv-panel'));
     } else if (section === 'Street View') {
       text(
         'p',
@@ -714,9 +796,13 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     } else if (section === 'More') {
       for (const name of [
         'Infrastructure',
+        'Radio',
+        'Flight details',
+        'Camera views',
         'Nexus',
         'Map',
         'Street View',
+        'Cameras',
         'Help',
         'Settings',
       ])
@@ -883,6 +969,19 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
     rememberWelcome();
   };
   window.addEventListener('phantom:welcome', welcome, { signal });
+  window.addEventListener(
+    'gev:awareness-subject-selected',
+    (event) => {
+      if (
+        event.detail?.origin !== 'user' ||
+        !['flights', 'military'].includes(event.detail?.layerId)
+      )
+        return;
+      selectedFlightLayer = event.detail.layerId;
+      open('Flight details', viewer.canvas);
+    },
+    { signal },
+  );
   root.querySelector('.phantom-brand').addEventListener(
     'click',
     (event) => {
@@ -922,6 +1021,7 @@ export function mountPhantomShell({ styleManager, dataManager, viewer }) {
   const stopData = dataManager.subscribeActivity(syncStatus);
   syncStatus();
   return () => {
+    cameraModes.destroy();
     specialist.destroy();
     drawerLifetime?.abort();
     controller.abort();

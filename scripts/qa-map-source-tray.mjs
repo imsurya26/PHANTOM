@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer';
+import { runPhantomMapChecks } from './qa-phantom-map.mjs';
+import { hookRenderErrors, readRenderErrors } from './qa-browserEvidence.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir = process.env.QA_SHOTS_DIR || path.join(repoRoot, 'qa-shots', 'map-source-tray');
@@ -19,7 +21,7 @@ const headful = process.argv.includes('--headful');
 const forceKeyless = process.argv.includes('--keyless')
   || process.env.QA_MAP_SOURCE_TRAY_KEYLESS === '1';
 const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
-  || await puppeteer.executablePath().catch(() => null);
+  || await puppeteer.executablePath();
 
 if (!executablePath || !fs.existsSync(executablePath)) {
   throw new Error('Puppeteer Chrome for Testing is unavailable');
@@ -42,6 +44,7 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 const failures = [];
 const consoleErrors = [];
+const pageErrors = [];
 
 page.on('console', (message) => {
   if (message.type() === 'error' && !/Failed to load resource.*404/i.test(message.text())) {
@@ -49,7 +52,10 @@ page.on('console', (message) => {
     consoleErrors.push(source ? `${message.text()} [${source}]` : message.text());
   }
 });
-page.on('pageerror', (error) => consoleErrors.push(error.message));
+page.on('pageerror', (error) => {
+  consoleErrors.push(error.message);
+  pageErrors.push(error.message);
+});
 
 const check = (name, passed, detail = '') => {
   console.log(`  [${passed ? 'PASS' : 'FAIL'}] ${name}${detail ? ` — ${detail}` : ''}`);
@@ -229,6 +235,7 @@ const layerFocusState = async (id) => ({
 });
 
 try {
+  await hookRenderErrors(page);
   await page.setViewport({ width: 1000, height: 900, deviceScaleFactor: 1 });
   await page.setRequestInterception(true);
   page.on('request', (request) => {
@@ -264,6 +271,11 @@ try {
     { timeout: 60_000 },
   );
 
+  if (await page.evaluate(() => document.body.classList.contains('phantom'))) {
+    await runPhantomMapChecks(page, shotsDir);
+    const errors = [...pageErrors, ...await readRenderErrors(page)];
+    check('no page or Cesium render errors', errors.length === 0, errors.join(' | '));
+  } else {
   const presentation = await page.evaluate(() => ({
     ids: [...document.querySelectorAll('.map-stack-chip')].map((chip) => chip.dataset.stackId),
     retiredPanel: Boolean(document.getElementById('stack-panel')),
@@ -1650,6 +1662,7 @@ try {
   }
 
   check('no new page or console errors', consoleErrors.length === 0, consoleErrors.join(' | '));
+  }
 } finally {
   await browser.close();
 }

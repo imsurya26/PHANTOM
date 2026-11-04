@@ -431,6 +431,26 @@ export function createQueries({
      * Get info about the currently selected vessel.
      * @returns {{ mmsi: string, name: string, latitude: number, longitude: number, speedKt: number|null, course: number|null, type: string }|null}
      */
+    getSelectedCameraTarget() {
+      const record = state.selectedRecord;
+      if (!state.feed.enabled || !record) return null;
+      const valid = (value) =>
+        Number.isFinite(value) && value >= 0 && value < 360;
+      const heading = valid(record.heading)
+        ? record.heading
+        : valid(record.course)
+          ? record.course
+          : null;
+      const position = components.rendering.getVisual(record)?.position;
+      if (!position || heading === null) return null;
+      return {
+        id: record.mmsi,
+        position,
+        heading,
+        stale: (record.missedRefreshes || 0) > 0,
+      };
+    },
+
     getSelectedInfo() {
       const record = state.selectedRecord;
       if (!record) return null;

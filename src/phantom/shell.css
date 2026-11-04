@@ -287,6 +287,19 @@ body.phantom-light {
   width: 100%;
   margin-bottom: 12px;
 }
+.phantom-flight-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 16px;
+  font-size: 13px;
+}
+.phantom-flight-details dt {
+  opacity: 0.75;
+}
+.phantom-flight-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 body.phantom #phantom-shell .phantom-specialist-body > .phantom-revealed {
   position: static !important;
   inset: auto !important;
@@ -553,6 +566,12 @@ body.phantom #phantom-shell .phantom-specialist-body > .phantom-revealed {
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: left;
+}
+
+#phantom-shell [data-camera-mode][aria-pressed='true'] {
+  color: var(--phantom-orange);
+  border-color: var(--phantom-orange);
+  background: var(--phantom-orange-dim);
 }
 .phantom-signals select {
   max-width: 100%;

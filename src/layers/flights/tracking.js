@@ -750,9 +750,19 @@ export function createTracking({
     // the ICAO hex, so a callsign-less enriched contact heads its readout with
     // the tail number rather than raw hex.
     const cs = parts.queries._contactLabel(icao24, info);
-    const altFt = Math.round((info.altitude || 0) * 3.28084);
-    const fl = altFt >= 18000 ? `FL${Math.round(altFt / 100)}` : `${altFt} ft`;
-    const spd = info.velocity ? `${Math.round(info.velocity * 1.944)} kts` : '';
+    const altFt = Number.isFinite(info.altitude)
+      ? Math.round(info.altitude * 3.28084)
+      : null;
+    const fl =
+      altFt === null
+        ? 'Altitude unavailable'
+        : altFt >= 18000
+          ? `FL${Math.round(altFt / 100)}`
+          : `${altFt} ft`;
+    const spd =
+      Number.isFinite(info.velocity) && info.velocity >= 0
+        ? `${Math.round(info.velocity * 1.944)} kts`
+        : 'Speed unavailable';
     const stale =
       flightState.records.missingPolls.get(icao24) || flightState.feed._backoff
         ? 'STALE'

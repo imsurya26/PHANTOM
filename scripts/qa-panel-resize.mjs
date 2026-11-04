@@ -7,6 +7,8 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { RESIZE_DIRECTIONS, resizeBox } from '../src/ui/panelResize.js';
+import { verifySpecialistPanels } from './qa-specialist-panels.mjs';
+import { waitForPhantom } from './qa-phantomShell.mjs';
 import {
   describePress,
   dockPanelByDoubleClick,
@@ -104,6 +106,21 @@ async function main() {
     const errors = [];
     monitors.push(watchPage(page, { name: 'panel', errors }));
     await hookRenderErrors(page);
+
+    await page.goto(`${url}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__godsEyeView?.dataManager, {
+      timeout: 150_000,
+    });
+    if (await page.$('#phantom-shell')) {
+      await waitForPhantom(page);
+      await verifySpecialistPanels(page);
+      assert.deepEqual(
+        [...errors, ...(await readRenderErrors(page))],
+        [],
+        'no page or render errors',
+      );
+      return;
+    }
 
     const boot = async () => {
       await page.goto(`${url}/`, { waitUntil: 'domcontentloaded' });

@@ -282,7 +282,8 @@ export function createRendering({
         point.scaleByDistance,
         cameraDistance,
       );
-      const halfExtentPx = (point.width || point.pixelSize || 5) * distanceScale * 0.5;
+      const halfExtentPx =
+        (point.width || point.pixelSize || 5) * distanceScale * 0.5;
       const focus = advanceSpriteFocus(point, {
         // Hidden points still release toward identity, preventing stale dim
         // alpha if a catalog/presentation toggle later makes them visible.

@@ -44,6 +44,15 @@ export function _renderCctvState(state) {
     this.actions.setPanelCollapsed('cctv-panel', false, {
       explicit: Boolean(state?.explicitSelection),
     });
+    // PHANTOM owns panel placement. An explicit selection may reveal its
+    // specialist host; polling and auto-hop must never steal the user's focus.
+    if (state?.explicitSelection) {
+      document.dispatchEvent?.(
+        new CustomEvent('phantom:open-panel', {
+          detail: { panelId: 'cctv-panel' },
+        }),
+      );
+    }
   }
   this._lastSeenCctvActiveId = effectiveActiveId;
 

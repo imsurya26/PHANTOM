@@ -72,7 +72,9 @@ function runTests(args) {
 
 export function runUnitTests() {
   const plan = buildUnitTestPlan(discoverUnitTestFiles());
-  const parallelStatus = runTests(['--test', ...plan.parallel]);
+  // Hundreds of Cesium-heavy workers can exhaust desktop memory when Node
+  // defaults to the machine's CPU count. Bound parallelism on every platform.
+  const parallelStatus = runTests(['--test', '--test-concurrency=4', ...plan.parallel]);
   if (parallelStatus !== 0) return parallelStatus;
 
   // The GC-bracketed budgets are calibrated on Node 24 and are meaningless on

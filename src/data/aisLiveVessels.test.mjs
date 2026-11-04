@@ -1336,7 +1336,7 @@ test('buildSelectedVesselCard: full detail card with MMSI + position time', () =
   assert.equal(card.title, 'EVER GIVEN');
   assert.deepEqual(card.details, [
     'CONTAINER SHIP · 14.5KT · 231°',
-    'MMSI 353136000 · POS: 11:22:33Z',
+    'MMSI 353136000 · POS: 2026-07-27 11:22:33Z',
   ]);
 });
 
@@ -1450,8 +1450,16 @@ test('buildSelectedVesselCard: destination line + STALE marker; placeholders for
   assert.deepEqual(card.details, [
     'TANKER · --KT · --°',
     '→ ROTTERDAM',
-    'MMSI 353136000 · POS: LIVE · STALE',
+    'MMSI 353136000 · POS TIME: UNAVAILABLE · STALE',
   ]);
+});
+
+test('vessel cards never label missing or malformed position timestamps as live', () => {
+  for (const lastPositionUtc of ['', null, 'invalid']) {
+    const card = buildSelectedVesselCard(makeRecord({ lastPositionUtc }));
+    assert.ok(card.details.some((line) => line.includes('POS TIME: UNAVAILABLE')));
+    assert.ok(card.details.every((line) => !line.includes('LIVE')));
+  }
 });
 
 // --- Vertical datum (h = N + lift) ------------------------------------------

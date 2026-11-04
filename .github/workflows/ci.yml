@@ -114,6 +114,25 @@ jobs:
         if: success() || failure()
         run: npm run qa:panel-resize -- --url http://localhost:4173
 
+      - name: Flight details gate
+        if: success() || failure()
+        env:
+          QA_BASE_URL: http://localhost:4173
+        run: npm run qa:flight-details
+
+      - name: Native map selector gate
+        if: success() || failure()
+        env:
+          QA_BASE_URL: http://localhost:4173
+          QA_SHOTS_DIR: qa-artifacts/map-source-tray
+        run: npm run qa:map-source-tray
+
+      - name: Object camera gate
+        if: success() || failure()
+        env:
+          QA_BASE_URL: http://localhost:4173
+        run: npm run qa:object-camera
+
       - name: Preview server log
         if: failure()
         run: cat preview.log

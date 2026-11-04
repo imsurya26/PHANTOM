@@ -342,7 +342,11 @@ test('zoomed-out coverage makes no requests or green dots and clears pending str
   const { viewer, source, state, coverage, bytes, onGlobe } = setup();
   viewer.view.height = 600_000;
   coverage.refresh();
-  assert.equal(source.calls.length, 0, 'regional view must not fetch overview dots');
+  assert.equal(
+    source.calls.length,
+    0,
+    'regional view must not fetch overview dots',
+  );
   assert.equal(onGlobe(), 0);
   assert.match(state.coverage.hint, /Zoom in/);
   viewer.view.height = 900;
@@ -354,7 +358,11 @@ test('zoomed-out coverage makes no requests or green dots and clears pending str
   assert.equal(pending.signal.aborted, true);
   pending.resolve(bytes);
   await settle();
-  assert.equal(onGlobe(), 0, 'late responses cannot restore distant green coverage');
+  assert.equal(
+    onGlobe(),
+    0,
+    'late responses cannot restore distant green coverage',
+  );
   assert.equal(state.coverage.pending.size, 0);
   coverage.clear();
 });

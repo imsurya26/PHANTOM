@@ -845,6 +845,32 @@ export function createQueries({
       return rest;
     },
 
+    /** Read camera heading without resampling or describing the aircraft. */
+    getTrackedHeading() {
+      const value = flightState.records.data.get(
+        flightState._trackedIcao,
+      )?.true_track;
+      return Number.isFinite(value) && value >= 0 && value <= 360
+        ? value
+        : null;
+    },
+
+    /** Reported telemetry for details UI; never substitute rendered positions. */
+    getTrackedFlightDetails() {
+      const id = flightState._trackedIcao;
+      const record = flightState.records.data.get(id);
+      if (!record) return null;
+      const { position, ...details } = _describeFlight(id) || {};
+      return {
+        ...details,
+        icao24: id,
+        altitudeM: Number.isFinite(record.altitude) ? record.altitude : null,
+        velocityMps: Number.isFinite(record.velocity) ? record.velocity : null,
+        track: Number.isFinite(record.true_track) ? record.true_track : null,
+        observedAt: record.lastContactEpochMs ?? null,
+      };
+    },
+
     /**
      * Return the current aircraft as a Context subject without changing
      * tracking or camera ownership.

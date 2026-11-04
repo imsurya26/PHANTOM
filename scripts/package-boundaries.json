@@ -877,6 +877,7 @@
       "src/layers/military/motion.js",
       "src/layers/military/policy.js",
       "src/layers/military/queries.js",
+      "src/layers/military/renderDemand.js",
       "src/layers/military/rendering.js",
       "src/layers/military/state.js",
       "src/layers/military/testing.js",
@@ -997,6 +998,7 @@
       "src/sources/tle.js",
       "src/layers/satellites/catalog.js",
       "src/layers/satellites/controls.js",
+      "src/layers/satellites/icon.js",
       "src/layers/satellites/index.js",
       "src/layers/satellites/ingestion.js",
       "src/layers/satellites/interaction.js",
@@ -1006,6 +1008,7 @@
       "src/layers/satellites/records.js",
       "src/layers/satellites/policy.js",
       "src/layers/satellites/rendering.js",
+      "src/layers/satellites/renderDemand.js",
       "src/layers/satellites/source.js",
       "src/layers/satellites/state.js",
       "src/layers/satellites/testing.js",
@@ -1437,6 +1440,7 @@
       "./standalone/catalog"
     ],
     "modules": [
+      "src/app/activeTileset.js",
       "src/cyberSonarScene.js",
       "src/cyberSonar.js",
       "src/hudLayouts.js",
@@ -2229,7 +2233,10 @@
       "src/tools/functions.js",
       "src/voice/actionSchemas.js",
       "src/view/index.js",
-      "src/app/embed.js"
+      "src/app/embed.js",
+      "src/layers/satellites/icon.js",
+      "src/layers/satellites/renderDemand.js",
+      "src/layers/military/renderDemand.js"
     ],
     "external": [
       "hls.js",
@@ -2754,7 +2761,10 @@
       "src/data/local_data/osm_military_names/names.json",
       "src/layers/installations/namedMarkers.js",
       "src/data/infrastructureOverlayEntry.js",
-      "src/sources/infrastructureData.js"
+      "src/sources/infrastructureData.js",
+      "src/layers/satellites/icon.js",
+      "src/layers/satellites/renderDemand.js",
+      "src/layers/military/renderDemand.js"
     ],
     "external": [
       "hls.js",

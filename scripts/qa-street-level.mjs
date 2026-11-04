@@ -14,6 +14,11 @@
  */
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import {
+  openStreetSpecialist,
+  assertSpecialist,
+  waitForPhantom,
+} from './qa-phantomShell.mjs';
 import { LAYER_STATE_REGISTRY } from '../src/data/layerState.js';
 import { tileBounds } from '../src/layers/streetLevel/tileMath.js';
 import { encodeCoverageTile } from '../src/layers/streetLevel/providers/mapillary/coverageFixture.mjs';
@@ -319,6 +324,12 @@ async function clearFirstRun(page) {
   await page.waitForFunction(() => Boolean(window.__godsEyeView?.dataManager), {
     timeout: 150_000,
   });
+  if (await page.$('#phantom-shell')) {
+    // Do not dismiss startup while the shared camera is still restoring.
+    // The loading cover follows the application's restoration completion.
+    await waitForPhantom(page);
+    return;
+  }
   await page.evaluate(() =>
     document.querySelector('.first-run-explore')?.click(),
   );
@@ -372,7 +383,11 @@ async function clickPanelControl(page, selector, { timeout = 5_000 } = {}) {
 
 /** Load the app and clear the first-run dialog. */
 export async function boot(page, url) {
-  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  const target = new URL(url);
+  // This gate covers imagery; onboarding has its own gate. Use the supported
+  // opt-out so its delayed welcome event cannot replace controls mid-click.
+  target.searchParams.set('welcome', '0');
+  await page.goto(target.href, { waitUntil: 'domcontentloaded' });
   await clearFirstRun(page);
 }
 
@@ -417,12 +432,12 @@ async function assertKeylessGate(page) {
     }),
   );
   await page.waitForFunction(
-    () => document.getElementById('sl-status').textContent === 'KEY REQUIRED',
+    () => document.getElementById('sl-status').textContent === 'UNAVAILABLE',
     { timeout: 30_000 },
   );
   const info = await readPanel(page);
   assert.equal(info.controlsDisabled, true);
-  assert.equal(info.status, 'KEY REQUIRED');
+  assert.equal(info.status, 'UNAVAILABLE');
   const chip = await page.$eval(
     '#sl-provider-chips [data-chip-id="mapillary"]',
     (node) => ({
@@ -431,7 +446,21 @@ async function assertKeylessGate(page) {
     }),
   );
   assert.equal(chip.error, true, 'the keyless provider chip reads as an error');
-  assert.match(chip.title, /MAPILLARY_CLIENT_TOKEN/);
+  assert.equal(
+    chip.title,
+    'Mapillary: This optional source is unavailable. Other map features are ready to explore.',
+  );
+  const state = await page.evaluate(() =>
+    window.__godsEyeView.dataManager.layers
+      .get('street-level')
+      .module.getUIState(),
+  );
+  assert.equal(state.keyRequired, true, 'keyless diagnostics remain explicit');
+  assert.equal(
+    state.keyRejected,
+    false,
+    'missing credentials are distinct from rejected credentials',
+  );
 }
 
 /**
@@ -590,6 +619,8 @@ async function main() {
     await watch(page, 'main');
     if (fixtures) await serveFixtures(page, fixture);
     await boot(page, url);
+    const phantom = Boolean(await page.$('#phantom-shell'));
+    if (phantom) await waitForPhantom(page);
     const panel = () => readPanel(page);
     const status = await page.evaluate(() =>
       fetch('/api/mapillary/status').then((res) => res.json()),
@@ -597,7 +628,7 @@ async function main() {
     for (const viewport of VIEWPORTS) {
       await page.setViewport(viewport);
       await step(
-        `panel is a collapsed right-rail strip at ${viewport.width}×${viewport.height}`,
+        `panel starts collapsed at ${viewport.width}×${viewport.height}`,
         async () => {
           await settle(
             page,
@@ -613,12 +644,23 @@ async function main() {
           assert.deepEqual(info.order, RAIL_ORDER);
           assert.ok(isCollapsed(info.classes));
           assert.equal(info.bodyDisplay, 'none');
-          assert.ok(info.width <= 200 && info.right <= viewport.width);
+          if (phantom)
+            assert.equal(info.width, 0, 'specialist stays hidden until opened');
+          else
+            assert.ok(
+              info.width > 0 &&
+                info.width <= 200 &&
+                info.right <= viewport.width,
+            );
         },
       );
     }
     await page.setViewport(VIEWPORTS[0]);
     const expandStrip = async (target = page) => {
+      if (await target.$('#phantom-shell')) {
+        await openStreetSpecialist(target);
+        return;
+      }
       await target.click(
         '.panel-collapse-btn[data-collapse-target="street-level-panel"]',
       );
@@ -667,7 +709,7 @@ async function main() {
     );
     if (!status.configured) {
       await step(
-        'keyless install gates the controls and reports KEY REQUIRED',
+        'keyless install gates the controls and reports UNAVAILABLE',
         () => assertKeylessGate(page),
       );
       await skipStep(
@@ -987,7 +1029,7 @@ async function main() {
       const QUIET_MS = 2 * COVERAGE_MOVE_DEBOUNCE_MS + 200;
       if (fixtures)
         await step(
-          'a key Mapillary rejects reads KEY REJECTED, stops asking (a pan that asks while accepted asks nothing while rejected), and clears when switched off',
+          'a key Mapillary rejects reports unavailable with rejection diagnostics, stops asking (a pan that asks while accepted asks nothing while rejected), and clears when switched off',
           async () => {
             // Positive control: with the key accepted, the same pan-and-wait
             // the rejected half uses does see new tile requests.
@@ -1003,7 +1045,17 @@ async function main() {
             await clickPanelControl(page, '#sl-status');
             await statusText('OFF');
             await clickPanelControl(page, '#sl-status');
-            await statusText('KEY REJECTED');
+            await statusText('UNAVAILABLE');
+            assert.equal(
+              await page.evaluate(
+                () =>
+                  window.__godsEyeView.dataManager.layers
+                    .get('street-level')
+                    .module.getUIState().keyRejected,
+              ),
+              true,
+              'provider rejection is retained in diagnostics',
+            );
             const shown = await page.evaluate(() => ({
               error: document.getElementById('sl-error').textContent,
               errorHidden: document.getElementById('sl-error').hidden,
@@ -1012,7 +1064,10 @@ async function main() {
                 .querySelector('#sl-provider-chips [data-chip-id="mapillary"]')
                 .classList.contains('chip-error'),
             }));
-            assert.match(shown.error, /rejected MAPILLARY_CLIENT_TOKEN/);
+            assert.match(
+              shown.error,
+              /Street imagery is temporarily unavailable/,
+            );
             assert.equal(shown.errorHidden, false);
             assert.equal(shown.controls, true);
             assert.equal(shown.chip, true);
@@ -1041,7 +1096,7 @@ async function main() {
       else
         await skipStep(
           'fixtures only',
-          'a key Mapillary rejects reads KEY REJECTED and stops asking',
+          'a key Mapillary rejects reports unavailable with rejection diagnostics and stops asking',
         );
 
       const fixtureIds = new Map(
@@ -1216,13 +1271,17 @@ async function main() {
               .getBoundingClientRect();
             return {
               scrollTop: inner.scrollTop,
-              top: wrap.top - box.top,
+              top:
+                wrap.top -
+                document
+                  .querySelector('#street-level-panel .panel-header')
+                  .getBoundingClientRect().bottom,
               overflowBottom: wrap.bottom - box.bottom,
             };
           });
           assert.equal(fit.scrollTop, 0, 'panel not scrolled');
           assert.ok(
-            fit.top >= 0 && fit.top < 80,
+            fit.top >= 0 && fit.top < 32,
             `viewer right under the header (${fit.top}px)`,
           );
           assert.ok(
@@ -1518,152 +1577,164 @@ async function main() {
           assert.equal(after.sequence.selectedId, null);
         },
       );
-      const floating = () =>
-        page.$eval('#street-level-panel', (node) =>
-          node.classList.contains('panel-floating'),
-        );
-      const center = (selector) =>
-        page.$eval(selector, (node) => {
-          const r = node.getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-        });
-      // Right after a dock the rail is still animating, so the shared helpers
-      // re-resolve the header and retry only a press that provably missed it.
-      const floatPanel = async () => {
-        const attempt = await liftPanelByHeader(page, PANEL_ID, {
-          dx: -400,
-          dy: 80,
-        });
-        assert.equal(
-          attempt.done,
-          true,
-          `a header drag lifts the panel out of the rail (${describePress(attempt)})`,
-        );
-        assert.equal(await floating(), true);
-      };
-      await step(
-        'the panel floats on a header drag, resizes, and the viewer takes the room',
-        async () => {
-          await openById(firstImageId);
-          await floatPanel();
-          const viewerHeight = () =>
-            page.$eval('#sl-viewer', (node) =>
-              Math.round(node.getBoundingClientRect().height),
-            );
-          const before = await viewerHeight();
-          const grip = await center('#street-level-panel .panel-resize-grip');
-          await page.mouse.move(grip.x, grip.y);
-          await page.mouse.down();
-          await page.mouse.move(grip.x + 120, grip.y + 160, { steps: 10 });
-          await page.mouse.up();
-          await settle(
-            page,
-            (height) =>
-              document.getElementById('sl-viewer').getBoundingClientRect()
-                .height >
-              height + 60,
-            before,
+      if (!phantom) {
+        const floating = () =>
+          page.$eval('#street-level-panel', (node) =>
+            node.classList.contains('panel-floating'),
           );
-          const after = await viewerHeight();
-          assert.ok(
-            after > before + 60,
-            `viewer grew with the window (${before} → ${after}px)`,
-          );
+        const center = (selector) =>
+          page.$eval(selector, (node) => {
+            const r = node.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          });
+        // Right after a dock the rail is still animating, so the shared helpers
+        // re-resolve the header and retry only a press that provably missed it.
+        const floatPanel = async () => {
+          const attempt = await liftPanelByHeader(page, PANEL_ID, {
+            dx: -400,
+            dy: 80,
+          });
           assert.equal(
-            await page.$eval(
-              '.sl-settings',
-              (node) => getComputedStyle(node).overflowY,
-            ),
-            'auto',
-            'only the settings block scrolls',
+            attempt.done,
+            true,
+            `a header drag lifts the panel out of the rail (${describePress(attempt)})`,
           );
-        },
-      );
-      await step(
-        'SHRINK after EXPAND docks the window back in the rail at its default size, viewer inside the panel',
-        async () => {
-          await clickPanelControl(page, '#sl-viewer-expand');
-          await settle(page, () =>
-            document
-              .getElementById('sl-viewer-wrap')
-              .classList.contains('sl-viewer-wrap-expanded'),
-          );
-          assert.equal(await expanded(), true, 'expanded');
-          await clickPanelControl(page, '#sl-viewer-expand');
-          await settle(
-            page,
-            () =>
-              !document
-                .getElementById('street-level-panel')
-                .classList.contains('panel-floating') &&
-              !document
+          assert.equal(await floating(), true);
+        };
+        await step(
+          'the panel floats on a header drag, resizes, and the viewer takes the room',
+          async () => {
+            await openById(firstImageId);
+            await floatPanel();
+            const viewerHeight = () =>
+              page.$eval('#sl-viewer', (node) =>
+                Math.round(node.getBoundingClientRect().height),
+              );
+            const before = await viewerHeight();
+            const grip = await center('#street-level-panel .panel-resize-grip');
+            await page.mouse.move(grip.x, grip.y);
+            await page.mouse.down();
+            await page.mouse.move(grip.x + 120, grip.y + 160, { steps: 10 });
+            await page.mouse.up();
+            await settle(
+              page,
+              (height) =>
+                document.getElementById('sl-viewer').getBoundingClientRect()
+                  .height >
+                height + 60,
+              before,
+            );
+            const after = await viewerHeight();
+            assert.ok(
+              after > before + 60,
+              `viewer grew with the window (${before} → ${after}px)`,
+            );
+            assert.equal(
+              await page.$eval(
+                '.sl-settings',
+                (node) => getComputedStyle(node).overflowY,
+              ),
+              'auto',
+              'only the settings block scrolls',
+            );
+          },
+        );
+        await step(
+          'SHRINK after EXPAND docks the window back in the rail at its default size, viewer inside the panel',
+          async () => {
+            await clickPanelControl(page, '#sl-viewer-expand');
+            await settle(page, () =>
+              document
                 .getElementById('sl-viewer-wrap')
                 .classList.contains('sl-viewer-wrap-expanded'),
-          );
-          assert.equal(await floating(), false, 'docked again');
-          const style = await page.$eval('#street-level-panel', (node) => ({
-            width: node.style.width,
-            height: node.style.height,
-            parent: node.parentElement.id,
-          }));
-          assert.deepEqual(style, {
-            width: '',
-            height: '',
-            parent: 'right-context-rail',
-          });
-          const home = await page.evaluate(() => {
-            const wrap = document.getElementById('sl-viewer-wrap');
-            return {
-              inPanel: Boolean(wrap.closest('#street-level-panel')),
-              onBody: wrap.parentElement === document.body,
-            };
-          });
-          assert.deepEqual(
-            home,
-            { inPanel: true, onBody: false },
-            'the viewer returned into the panel',
-          );
-        },
-      );
-      await step('a header double-click docks a floating window', async () => {
-        await floatPanel();
-        const attempt = await dockPanelByDoubleClick(page, PANEL_ID);
-        assert.equal(
-          attempt.done,
-          true,
-          `docked again (${describePress(attempt)})`,
-        );
-      });
-      await step(
-        'collapsing a floating window docks it as the rail strip',
-        async () => {
-          // The double-click just docked a panel showing a photo: let the photo
-          // and its sequence finish loading before pressing the header again.
-          await uiUntil((u) => !u.street.loading && !u.sequence.loading);
-          await floatPanel();
-          await clickPanelControl(
-            page,
-            '.panel-collapse-btn[data-collapse-target="street-level-panel"]',
-          );
-          await settle(page, () => {
-            const node = document.getElementById('street-level-panel');
-            return (
-              node.classList.contains('collapsed') &&
-              !node.classList.contains('panel-floating')
             );
-          });
-          const state = await page.$eval('#street-level-panel', (node) => ({
-            floating: node.classList.contains('panel-floating'),
-            collapsed: node.classList.contains('collapsed'),
-            height: node.style.height,
-          }));
-          assert.deepEqual(state, {
-            floating: false,
-            collapsed: true,
-            height: '',
-          });
-        },
-      );
+            assert.equal(await expanded(), true, 'expanded');
+            await clickPanelControl(page, '#sl-viewer-expand');
+            await settle(
+              page,
+              () =>
+                !document
+                  .getElementById('street-level-panel')
+                  .classList.contains('panel-floating') &&
+                !document
+                  .getElementById('sl-viewer-wrap')
+                  .classList.contains('sl-viewer-wrap-expanded'),
+            );
+            assert.equal(await floating(), false, 'docked again');
+            const style = await page.$eval('#street-level-panel', (node) => ({
+              width: node.style.width,
+              height: node.style.height,
+              parent: node.parentElement.id,
+            }));
+            assert.deepEqual(style, {
+              width: '',
+              height: '',
+              parent: 'right-context-rail',
+            });
+            const home = await page.evaluate(() => {
+              const wrap = document.getElementById('sl-viewer-wrap');
+              return {
+                inPanel: Boolean(wrap.closest('#street-level-panel')),
+                onBody: wrap.parentElement === document.body,
+              };
+            });
+            assert.deepEqual(
+              home,
+              { inPanel: true, onBody: false },
+              'the viewer returned into the panel',
+            );
+          },
+        );
+        await step(
+          'a header double-click docks a floating window',
+          async () => {
+            await floatPanel();
+            const attempt = await dockPanelByDoubleClick(page, PANEL_ID);
+            assert.equal(
+              attempt.done,
+              true,
+              `docked again (${describePress(attempt)})`,
+            );
+          },
+        );
+        await step(
+          'collapsing a floating window docks it as the rail strip',
+          async () => {
+            // The double-click just docked a panel showing a photo: let the photo
+            // and its sequence finish loading before pressing the header again.
+            await uiUntil((u) => !u.street.loading && !u.sequence.loading);
+            await floatPanel();
+            await clickPanelControl(
+              page,
+              '.panel-collapse-btn[data-collapse-target="street-level-panel"]',
+            );
+            await settle(page, () => {
+              const node = document.getElementById('street-level-panel');
+              return (
+                node.classList.contains('collapsed') &&
+                !node.classList.contains('panel-floating')
+              );
+            });
+            const state = await page.$eval('#street-level-panel', (node) => ({
+              floating: node.classList.contains('panel-floating'),
+              collapsed: node.classList.contains('collapsed'),
+              height: node.style.height,
+            }));
+            assert.deepEqual(state, {
+              floating: false,
+              collapsed: true,
+              height: '',
+            });
+          },
+        );
+      } else {
+        await step(
+          'Street imagery remains inside the responsive specialist host',
+          async () => {
+            await assertSpecialist(page, PANEL_ID);
+          },
+        );
+      }
       await step(
         'on a phone the whole photo fits in the docked panel',
         async () => {
@@ -1779,7 +1850,7 @@ async function main() {
       );
       if (fixtures)
         await step(
-          'keyless install (a second page, no key on the server) gates the controls and reports KEY REQUIRED',
+          'keyless install (a second page, no key on the server) gates the controls and reports UNAVAILABLE',
           async () => {
             const keyless = await browser.newPage();
             await keyless.setViewport(VIEWPORTS[0]);
@@ -1799,7 +1870,7 @@ async function main() {
       else
         await skipStep(
           'fixtures only',
-          'keyless install (a second page) reports KEY REQUIRED',
+          'keyless install (a second page) reports UNAVAILABLE',
         );
       if (fixtures)
         await step(

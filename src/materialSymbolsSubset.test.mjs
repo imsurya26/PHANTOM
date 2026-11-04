@@ -26,7 +26,8 @@ function sourceFiles(directory = SRC_ROOT) {
   const files = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...sourceFiles(absolute));
+    if (entry.isDirectory() && entry.name !== 'graphify-out')
+      files.push(...sourceFiles(absolute));
     else if (
       entry.isFile() &&
       /\.(js|mjs|html)$/.test(entry.name) &&
@@ -62,11 +63,14 @@ function referencedGlyphs() {
       if (!found.has(glyph)) found.set(glyph, relative);
     };
     for (const match of source.matchAll(SPAN_TEXT)) add(match[1]);
-    for (const match of source.matchAll(TEXT_ASSIGNMENT)) {
+    const assignmentSource = source.replace(/`[^`]*\$\{[^`]*`/g, '""');
+    for (const match of assignmentSource.matchAll(TEXT_ASSIGNMENT)) {
       const statement = match[1].replaceAll('?.', '.');
       const assigned = statement.includes('?')
         ? statement.slice(statement.indexOf('?') + 1)
         : statement;
+      // Interpolated prose is not an icon ligature. Its nested fallback words
+      // (for example `${state.audioState || 'stopped'}`) are not the full text.
       for (const literal of assigned.matchAll(STRING_LITERAL)) add(literal[1]);
     }
   }
