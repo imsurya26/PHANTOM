@@ -1,139 +1,84 @@
-# Production rescue checkpoint — 3 November 2026
+# PHANTOM production rescue — acceptance checkpoint
 
-## Continuation — 4 November 2026
+Updated 7 November 2026. Final release is under feature freeze; earlier
+enhancement plans are superseded. Production deployment verification is pending.
+Earlier dated logs are historical results, not claims about current provider availability.
 
-Final continuation verification: simulated ship entry, safe camera height,
-cached-position label and source-loss release passed in Chrome. Manifest,
-service-worker control, exact three-file static cache, offline navigation,
-reconnect and printable session PDF passed. Network loss was emulated for both
-the page and service worker. Navigation fetches bypass the HTTP cache to avoid
-returning a stale application document when offline. Latest review regressions:
-28 passed; production build, formatting, boundaries and secret scanning passed.
-Native OS installation and service-worker upgrade acceptance remain unverified.
-The security changes are committed as `6f4ff1e`; later commits preserve the
-application and QA changes. No deployment has been performed.
+## Repository
 
-- Added reported flight details, unavailable schedule/status fields, inferred
-  route labels, stale observation handling and safe text rendering. Desktop and
-  mobile browser checks passed.
-- Added Follow, Chase, Orbit, Top-down and Cinematic views using existing Cesium
-  tracking ownership, manual/navigation cancellation and reduced-motion support.
-  Five-mode browser checks passed with safe ranges and no render exceptions.
-- Added simulated ship first-person using selected AIS positions and reported
-  heading/course. No onboard imagery or authentic cockpit geometry is claimed.
-  Source loss, identity changes and large corrections release the camera.
-  Browser acceptance of this new ship mode remains outstanding.
-- Vessel cards now report missing observation timestamps as unavailable and show
-  the date with valid timestamps, rather than labeling undated positions LIVE.
-- Migrated map-source QA to the native shell selector, preserving the legacy
-  branch. Native desktop/mobile selection, camera/layer preservation, keyboard
-  access and provider failure/recovery checks passed.
-- Full suite before the latest first-person/offline additions: 6,404 tests,
-  6,394 passed, zero failures, 10 existing skips; all 14 allocation tests passed.
-  Subsequent first-person/camera/AIS focused run: 89 passed.
-- Subagent audit found weather and combined-signals kill-switch gaps. Both local
-  and hosted gateways now reject those routes when their providers are disabled.
-  Combined signals are conservatively unavailable when either constituent
-  provider is disabled; selective source fallback is not implemented.
-- Added a regression for terrain arriving beneath the simulated first-person
-  camera; the interpolated eye is clamped above loaded terrain every frame.
-- Offline notice, manifest/icons, update prompt and print summary were started
-  by a subagent. They are not yet browser-accepted. The service worker caches
-  only the static offline notice assets, not provider responses or app bundles.
+Work continues on `codex/phantom-production-rescue`. Commits `6f4ff1e`,
+`1a4c419` and `0e2604f` were pushed to the PHANTOM remote. The final release
+integrates provider controls, camera safety, corrected documentation and
+acceptance checks. The existing Vercel project is `phantom`; production history
+confirms `main` and the public origin `https://phantom-lake-two.vercel.app`.
+Unrelated local skill folders are excluded from this work.
 
-Subagents stopped after an execution usage limit. No commit, push or deployment
-has been performed. Remaining release work below still applies, except the
-flight card and tracked camera modes are now implemented as described above.
+## Implemented and verified
 
-NOT READY TO MERGE. This is a stabilization checkpoint, not completion of the
-production rescue and enhancement request.
+- Current-shell Street Level/CCTV controls and responsive specialist panels.
+  Strict Street Level fixture gate passed 27 stages without skips; legacy
+  floating-panel checks remain in the legacy-shell branch.
+- Native map selector with keyboard access, camera/layer preservation and
+  provider failure/recovery checks on desktop and mobile.
+- Flight details with reported measurements, inferred route labels, unavailable
+  schedules/status, stale timestamps and safe text rendering. Zero measurements
+  remain zero. Provider aircraft identity is preserved despite visual overrides.
+- Follow, Chase, Orbit, Top-down and Cinematic camera views using existing
+  tracking ownership. Manual input/navigation cancels automatic motion.
+- Simulated AIS ship first-person, explicitly distinguished from onboard video
+  and authentic cockpit geometry. Source loss/change and large corrections
+  release ownership, including during arrival. Loaded terrain clamps the eye.
+- Radio directory search/filtering reuses the existing player. Infrastructure
+  navigation includes attributed submarine cables and landing points.
+- Hosted CSP, server-side provider disable enforcement, broader provider status
+  coverage, distributed admission checks and private storage-token scanning.
+- Offline notice with a strictly bounded static cache, manifest/icons, explicit
+  update notification/reload, and printable session summaries. Chrome
+  installability criteria, worker upgrade, offline/reconnect and print PDF passed.
 
-## Repository and architecture
+## Executed validation
 
-Continued on `codex/phantom-production-rescue`, based on `b028045`. The checkout
-already contained uncommitted dependency, radio, provider-status, satellite,
-Street Level and CCTV work. Those changes were preserved. No deployment or
-push was performed.
+- `npm ci`: final locked install passed under Node 24.14.0 with zero reported
+  vulnerabilities. The system npm wrapper used unsupported Node 24.13.1 on the
+  first attempt; the final run explicitly used the supported runtime.
+- `npm audit --json`: zero vulnerabilities at the recorded run.
+- Supported Node 24.14.0 doctor: passed. System Node 24.13.1 is unsupported.
+- Latest combined full unit run: 6,420 tests, 6,410 passed, zero failed,
+  10 pre-existing skips. All 14 separate allocation checks passed.
+- Focused provider completion: 31 passed. Focused camera safety: 33 passed.
+  Offline worker tests: 3 passed. Reported aircraft identity regression: passed.
+- Standard and Vercel production builds passed. Formatting and package boundaries
+  passed. Source/history/artifact scanning reported no findings across 2,251
+  source files and 456 artifacts. Bundle-size warnings remain.
+- Two obsolete README assertions initially failed after documentation cleanup.
+  Their navigation/marketing expectations were updated while preserving export,
+  attribution and accuracy guards. The complete rerun above includes the fixes.
+- Final Chrome gates for flight details, tracked modes, current panels, native
+  map selector and offline/update/print passed against the Vercel-configured
+  build. Earlier simulated ship entry/source-loss checks also passed.
+- Performance gate initially passed 23/24: its animated-style assertion compared
+  a 60-FPS-capped viewer against uncapped high-refresh browser callbacks. The
+  cadence correction preserves the original thresholds while respecting the
+  configured frame cap. The isolated rerun passed all 24 checks without skips.
 
-The application uses native JavaScript, Vite and Cesium, with retained layer
-owners and a PHANTOM navigation shell. Local provider middleware and the Vercel
-adapter are separate execution paths. The latter must enforce its own admission
-and disable policies. The shell moves retained controls into one specialist
-host; hidden legacy rails are not the current user interaction contract.
+## Remaining acceptance
 
-## Repairs in this checkpoint
+- Final Git publication, production deployment and verification of that exact
+  revision remain release-time operations. Existing production preflight passed
+  public search, status, origin/Redis admission and truthful AIS unavailability.
+- Optional selected AIS ship model work was preserved in ignored local artifacts
+  and excluded under the feature freeze; existing vessel rendering is retained.
+- Local ADS-B hardware and persistent AIS collection need actual infrastructure.
+- Native OS installation and iOS/Safari installation are not proven by Chrome's
+  headless installability check.
 
-- Added More → Cameras with explicit public-camera layer and control actions.
-  Copy distinguishes snapshots, recorded clips and live video.
-- Added desktop/phone browser checks for Street Level and CCTV open, collapse,
-  expand, close, focus restoration, viewport containment and hidden resize handles.
-  The panel gate retains its legacy floating/resize checks for the legacy shell.
-- Migrated the strict Street Level gate to shell navigation and current
-  unavailable wording, retaining provider-rejection diagnostics assertions.
-  Floating-window checks apply only to the legacy shell.
-- Applied the repository formatter and repaired missing module ownership entries.
-- Bounded unit-test worker concurrency to four to reduce desktop resource pressure.
-- Made setup-report formatting tolerate missing optional credential entries.
-- Corrected icon-font QA to ignore generated graph output and words embedded
-  inside interpolated prose, while retaining literal glyph checks.
-- Enforced hosted provider disable checks before handler dispatch, omitted disabled
-  browser credentials from hosted builds, corrected adapter availability reporting,
-  and added the reviewed application CSP to hosted responses.
-- Extended secret scanning to both supported Redis token aliases.
-- Corrected flight readouts: missing/nonfinite altitude and speed are unavailable;
-  measured zero altitude and speed remain visible. Existing aviation units remain.
+Cars/trucks in aggregate road flow are not individually verified vehicle
+telemetry. Submarines have no reliable individual position source here. The app
+must not invent these objects, flight schedules, or spacecraft telemetry to
+appear complete. See [vehicle acceptance](VEHICLE-ACCEPTANCE.md),
+[provider acceptance](PROVIDER-ACCEPTANCE.md), and
+[PWA acceptance](PWA-ACCEPTANCE.md) for supported capabilities and exact limits.
 
-Existing in-progress radio directory and cable navigation changes remain. Radio
-search filters the accepted catalog and reuses the existing player. These are not
-claims that every station is playable or that every requested global layer was
-newly implemented or verified.
-
-## Executed verification
-
-- `npm ci`: passed after retrying the Windows permission failure. Installation
-  initially used system Node 24.13.1 and warned about the engine requirement.
-- `npm audit --json`: passed, zero reported vulnerabilities.
-- `npm run doctor -- --json`: failed as expected on system Node 24.13.1; passed
-  using a cached Node 24.14.0 runtime without replacing system Node.
-- `npm run format:check`: passed, 1,356 files.
-- `npm run check:boundaries`: passed after ownership repairs.
-- `npm run build`: passed; existing large-chunk warnings remain.
-- `npm run security:scan`: passed, no findings in source or reachable history.
-- `npm run security:scan -- --artifacts --no-history`: passed, 448 artifacts,
-  no findings, configured-value comparison enabled.
-- Focused security/setup tests: 21 passed. Focused adapter, radio and specialist
-  regressions: 22 passed.
-- `npm run qa:panel-resize -- --url http://localhost:4186`: passed against the
-  production preview. `qa:specialist-panels` also passed and saved screenshots.
-- Regular unit-suite rerun: 6,393 tests, 6,383 passed, zero failures, 10 existing
-  skips. Separate supported-Node allocation run: all 14 checks passed. The full
-  runner also executes the allocation checks serially after the regular suite.
-- Subsequent flight telemetry and existing flight regressions: 58 passed.
-- Hosted build (`npm run build -- --config build/vercel.config.js --outDir
-  qa-artifacts/vercel-build`): passed, with existing chunk-size warnings.
-- Strict Street Level fixture QA: 27 stages passed, zero skips, no page or
-  Cesium render exceptions. Includes provider rejection, coverage picks, photos,
-  modal focus, phone layout, reload/share restoration and keyless behavior.
-  The harness now waits for startup restoration and uses the supported welcome
-  opt-out; the delayed introduction cannot replace controls mid-click.
-
-Browser screenshots were visually reviewed at 1440×900 and 390×844. Specialist
-controls fit and the map/navigation remain visible. The browser gate checks page
-and Cesium render exceptions. This is not verification of live CCTV playback,
-all provider network responses, or hardware performance targets.
-
-## Remaining release work
-
-The universal camera-mode overhaul, first-person support for every requested
-vehicle category, additional vehicle assets, complete flight-schedule card,
-full layer-by-layer live acceptance, performance budgets, PWA/print acceptance,
-and public-deployment authentication review are not completed by this checkpoint.
-Retained aircraft cockpit/tracking, local ADS-B, maritime, transit, cables,
-weather and space modules must not be mistaken for newly verified implementations
-of every requested enhancement. Local receiver hardware was not exercised.
-
-Use supported Node 24.14+ within 24.x or Node 26.x on Windows, Linux and macOS:
-`npm ci`, `npm run doctor`, then `npm run dev`. Shell-specific optional scripts
-are not required for this workflow. Keep private credentials in ignored local
-environment files or hosting settings. Never infer verified provider access from
-credential presence alone.
+Use Node 24.14+ within 24.x or Node 26.x on Windows, Linux and macOS:
+`npm ci`, `npm run doctor`, then `npm run dev`. Keep credentials in ignored local
+environment files or hosting settings; configuration does not verify access.

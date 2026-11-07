@@ -39,6 +39,17 @@ const allow = () => ({
   consume: async () => ({ allowed: true, retryAfter: 1 }),
 });
 
+test('optional provider switches cover local nested routes without blocking unrelated reads', async () => {
+  for (const id of ['celestrak', 'radio', 'transit', 'gbfs', 'launches', 'noaa']) {
+    const gateway = createGateway({ limiter: allow(), providerStatus: { disabled: candidate => candidate === id } });
+    const route = id === 'noaa' ? 'weather' : id;
+    const result = await request(gateway, `/api/${route}/status`);
+    assert.equal(result.res.status, 503, id);
+    assert.equal(result.passed, false, id);
+    assert.equal((await request(gateway, '/api/flights')).passed, true, id);
+  }
+});
+
 test('provider kill switches deny optional routes without blocking unrelated map data', async () => {
   const gateway = createGateway({
     limiter: allow(),

@@ -73,6 +73,7 @@
  * throttling so rAF cadence is trustworthy (hidden-pane gotcha).
  */
 import puppeteer from 'puppeteer';
+import { expectedRenderFrames } from './qa-frame-cadence.mjs';
 
 const argv = process.argv;
 const url = argv.includes('--url') ? argv[argv.indexOf('--url') + 1] : 'http://localhost:4173';
@@ -128,14 +129,15 @@ try {
 
   /** Count scene postRender fires and rAF ticks over windowMs. */
   const countFrames = (windowMs) => page.evaluate((ms) => new Promise((resolve) => {
-    const scene = window.__godsEyeView.viewer.scene;
+    const viewer = window.__godsEyeView.viewer;
+    const scene = viewer.scene;
     let renders = 0; let rafs = 0;
     const remove = scene.postRender.addEventListener(() => { renders += 1; });
     const t0 = performance.now();
     const tick = () => {
       rafs += 1;
       if (performance.now() - t0 < ms) requestAnimationFrame(tick);
-      else { remove(); resolve({ renders, rafs }); }
+      else { remove(); resolve({ renders, rafs, elapsedMs: performance.now() - t0, targetFrameRate: viewer.targetFrameRate }); }
     };
     requestAnimationFrame(tick);
   }), windowMs);
@@ -327,7 +329,9 @@ try {
   const dAnim = await diag();
   check('animated style takes the style-anim hold (continuous)', dAnim?.mode === 'continuous' && dAnim.holds.includes('style-anim'), dAnim);
   const animFrames = await countFrames(2_000);
-  check('animated style keeps frames flowing (≥50% rAF)', animFrames.renders >= animFrames.rafs * 0.5, animFrames);
+  // Viewer intentionally caps rendering at 60 Hz. Raw rAF can run at 165 Hz;
+  // comparing to it directly would reject a renderer meeting its full budget.
+  check('animated style keeps frames flowing (≥50% available capped cadence)', animFrames.renders >= expectedRenderFrames(animFrames) * 0.5, animFrames);
   // Returning to normal keeps detection ON by design (it is the default, and
   // detection persists across style switches). Since 2026-08-22 detection holds
   // nothing, so this asserts the strictly harder thing: the scene returns to
@@ -385,7 +389,7 @@ try {
   const active = await countFrames(5_000);
   const d4 = await diag();
   check('governor reports continuous mode with flights on', d4?.mode === 'continuous', d4);
-  check('flights-on cadence ≈ rAF cadence (≥70%)', active.renders >= active.rafs * 0.7, active);
+  check('flights-on cadence meets ≥70% available capped cadence', active.renders >= expectedRenderFrames(active) * 0.7, active);
   check('flights-on renders ≥5× idle renders', active.renders >= Math.max(1, idle.renders) * 5, { active: active.renders, idle: idle.renders });
 
   // ── 5. flights disabled → idle again ──────────────────────────────────

@@ -17,6 +17,13 @@ output/
 # Browser QA gate evidence (screenshots, console and network dumps).
 qa-artifacts/
 .DS_Store
+Thumbs.db
+Desktop.ini
+# Local test/tool output; build/ contains source and must remain tracked.
+coverage/
+.cache/
+__pycache__/
+*.pyc
 .vercel/
 .gstack/
 graphify-out/

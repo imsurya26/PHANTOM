@@ -23,6 +23,16 @@ test('weather and combined signal routes honor provider kill switches', async ()
   }
 });
 
+test('optional public adapters remain unverified until observed and honor disable settings', async () => {
+  const ids = ['celestrak', 'radio', 'transit', 'gbfs', 'launches'];
+  const status = await call(createVercelHandler({ env: {} }), '/api/providers/status');
+  for (const id of ids) {
+    assert.equal(status.body.providers.find(provider => provider.id === id)?.reason, 'not-verified', id);
+    const handler = createVercelHandler({ env: { PHANTOM_DISABLED_PROVIDERS: id }, fetchImpl: async () => assert.fail('disabled provider contacted') });
+    assert.equal((await call(handler, `/api/${id}/status`)).statusCode, 503, id);
+  }
+});
+
 test('Vercel disabled providers are denied before status or upstream dispatch', async () => {
   const handler = createVercelHandler({
     env: {

@@ -41,6 +41,11 @@ export const ProviderRegistry = Object.freeze(
     ['nominatim', 'OpenStreetMap place search', [], null],
     ['usgs', 'USGS earthquakes', [], 60000],
     ['noaa', 'NOAA weather', [], 300000],
+    ['celestrak', 'CelesTrak orbital elements', [], 21600000],
+    ['radio', 'Radio Browser directory', [], null],
+    ['transit', 'Public transit feeds', [], null],
+    ['gbfs', 'Bike-share feeds', [], null],
+    ['launches', 'Launch Library 2', [], null],
     ['free-map', 'Free globe', [], null],
   ].map(([id, name, fallback, expectedIntervalMs]) =>
     Object.freeze({

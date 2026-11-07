@@ -84,6 +84,11 @@ export function createGateway({
       ['tomtom', /^\/api\/tomtom(?:[/.]|$)/i],
       ['google-places', /^\/api\/google(?:[/.]|$)/i],
       ['mapillary', /^\/api\/mapillary(?:[/.]|$)/i],
+      ['celestrak', /^\/api\/celestrak(?:[/.]|$)/i],
+      ['radio', /^\/api\/radio(?:[/.]|$)/i],
+      ['transit', /^\/api\/transit(?:[/.]|$)/i],
+      ['gbfs', /^\/api\/gbfs(?:[/.]|$)/i],
+      ['launches', /^\/api\/launches(?:[/.]|$)/i],
       ['noaa', /^\/api\/(?:weather|wind|cyclones)(?:[/.]|$)/i],
     ].find(([, pattern]) => pattern.test(path))?.[0];
     if (

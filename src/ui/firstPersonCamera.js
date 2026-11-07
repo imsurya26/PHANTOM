@@ -66,6 +66,22 @@ export function createFirstPersonCamera(
     cached = initial.stale === true;
     const owner = generation;
     const initialPose = pose(initial);
+    const arrivalPosition = Cesium.Cartesian3.clone(initial.position);
+    const stillSelected = () => {
+      const current = readTarget();
+      return (
+        !viewer.isDestroyed?.() &&
+        !viewer.trackedEntity &&
+        usableFirstPersonTarget(current) &&
+        current.id === selectedId &&
+        Cesium.Cartesian3.distance(arrivalPosition, current.position) <= 2000
+      );
+    };
+    // Selection can disappear while flyTo is still in progress. Cancel that
+    // arrival immediately instead of flying to an obsolete provider position.
+    removeFrame = viewer.scene.preUpdate.addEventListener(() => {
+      if (!stillSelected()) stop();
+    });
     flying = true;
     viewer.camera.flyTo({
       ...initialPose,
@@ -73,6 +89,12 @@ export function createFirstPersonCamera(
       complete() {
         if (owner !== generation) return;
         flying = false;
+        removeFrame?.();
+        removeFrame = null;
+        if (!stillSelected()) {
+          stop();
+          return;
+        }
         let previous = now();
         let heading = initialPose.orientation.heading;
         const destination = Cesium.Cartesian3.clone(initialPose.destination);

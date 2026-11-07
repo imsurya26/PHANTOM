@@ -37,7 +37,11 @@ The public API explicitly adapts Gemini token provisioning, OpenAQ, provider
 status, regional live flights, worldwide military aircraft, and place search.
 Aircraft reads use adsb.lol public observations with bounded response sizes,
 timeouts, coalescing and caching. The initial camera opens at regional altitude
-so aircraft above the city are visible. Other server endpoints return an unavailable response. Local receiver
+so aircraft above the city are visible. Additional read adapters cover cameras,
+radio, transit, GBFS, launches, routing, orbital elements, weather, wind,
+cyclones and signals. See [provider acceptance](PROVIDER-ACCEPTANCE.md) for
+tested controls and external limits. Unsupported endpoints return unavailable.
+Local receiver
 access, credential editing, MCP and debug endpoints are never exposed. AISStream
 needs a persistent collector and shared snapshots rather than a socket started
 independently in each function invocation.

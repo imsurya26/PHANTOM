@@ -648,7 +648,7 @@ test('allocation accounting includes Cesium render aliases and excludes QA helpe
   });
 });
 
-test('public transit documentation uses courtesy attribution and the approved ground sentence', () => {
+test('public transit documentation retains attribution and truthful keyless/height claims', () => {
   const data = readFileSync(
     new URL('../../DATA_SOURCES.md', import.meta.url),
     'utf8',
@@ -673,16 +673,9 @@ test('public transit documentation uses courtesy attribution and the approved gr
     new URL('../../README.md', import.meta.url),
     'utf8',
   );
-  assert.ok(
-    readme.includes(
-      'Twenty layers and map sources. **Seventeen have a keyless path.**',
-    ),
-  );
-  assert.ok(
-    readme.includes(
-      '**Sits on the real ground.** Entity heights are aligned to work with Google 3D tiles, so aircraft park on aprons and cameras stand on street corners instead of floating.',
-    ),
-  );
+  // The release README describes the keyless globe without fixed layer counts
+  // or blanket ground-alignment promises across optional map providers.
+  assert.match(readme, /globe starts without API credentials/);
   assert.doesNotMatch(
     readme,
     /geoid-aware|sampled against the _rendered_ terrain mesh/,

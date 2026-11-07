@@ -864,6 +864,10 @@ export function createQueries({
       return {
         ...details,
         icao24: id,
+        // The details card reports provider identity, not a user-selected
+        // fictional model override used by the visual presentation.
+        typeName: record.typeName ?? null,
+        typeCode: record.typeCode ?? null,
         altitudeM: Number.isFinite(record.altitude) ? record.altitude : null,
         velocityMps: Number.isFinite(record.velocity) ? record.velocity : null,
         track: Number.isFinite(record.true_track) ? record.true_track : null,

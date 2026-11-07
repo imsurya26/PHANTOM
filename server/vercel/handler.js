@@ -122,6 +122,10 @@ export function createVercelHandler({
               'noaa',
               'gdelt',
               'wikimedia',
+              'radio',
+              'transit',
+              'gbfs',
+              'launches',
             ].includes(provider.id)
           )
             return provider;

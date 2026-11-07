@@ -138,7 +138,14 @@ test('nothing promises a GeoJSON export for drawn shapes', () => {
       `${file} still claims a GeoJSON export`,
     );
   }
-  for (const file of ['README.md', 'CHANGELOG.md', 'docs/CURRENT-STATE.md']) {
+  // The concise PHANTOM README no longer documents legacy DISPLAY controls.
+  // Keep its export claim guard without requiring obsolete navigation prose.
+  assert.doesNotMatch(
+    read('README.md'),
+    /(?:export[^\n]{0,80}GeoJSON|GeoJSON[^\n]{0,80}export)/i,
+    'README must not promise an unsupported GeoJSON export',
+  );
+  for (const file of ['CHANGELOG.md', 'docs/CURRENT-STATE.md']) {
     const source = read(file);
     const at = source.indexOf('DISPLAY ▸ **Draw**');
     const start = at >= 0 ? at : source.indexOf('DISPLAY ▸ Draw');

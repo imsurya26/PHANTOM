@@ -133,6 +133,16 @@ jobs:
           QA_BASE_URL: http://localhost:4173
         run: npm run qa:object-camera
 
+      - name: Offline and print gate
+        if: success() || failure()
+        env:
+          QA_BASE_URL: http://localhost:4173
+        run: npm run qa:offline
+
+      - name: Render governor performance gate
+        if: success() || failure()
+        run: npm run qa:perf -- --url http://localhost:4173
+
       - name: Preview server log
         if: failure()
         run: cat preview.log
