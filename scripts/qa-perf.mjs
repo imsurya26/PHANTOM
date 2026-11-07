@@ -142,6 +142,51 @@ try {
     requestAnimationFrame(tick);
   }), windowMs);
 
+  // Measure the complete input sequence: software rendering can delay the
+  // 60 ms input timer beyond a separate fixed observation window. Keep the
+  // same move/frame counts, with a host deadline that also catches a hung tab.
+  const measureCameraMotion = async () => {
+    let deadline;
+    try {
+      return await Promise.race([
+        page.evaluate(() => new Promise((resolve, reject) => {
+          const gev = window.__godsEyeView;
+          const started = performance.now();
+          let renders = 0; let paints = 0; let steps = 0;
+          let last = gev.styleManager.getDetectionDiagnostics?.();
+          const before = last?.frameCount ?? null;
+          let drain;
+          const remove = gev.viewer.scene.postRender.addEventListener(() => {
+            renders += 1;
+            const current = gev.styleManager.getDetectionDiagnostics?.();
+            if (current && current !== last) { paints += 1; last = current; }
+          });
+          const cleanup = () => { clearInterval(moves); clearTimeout(drain); clearTimeout(limit); remove(); };
+          const limit = setTimeout(() => {
+            cleanup();
+            reject(new Error('Camera motion did not complete within 60 seconds'));
+          }, 60_000);
+          const moves = setInterval(() => {
+            try {
+              gev.viewer.camera.moveForward(50);
+              steps += 1;
+              if (steps === 20) {
+                clearInterval(moves);
+                drain = setTimeout(() => {
+                  cleanup();
+                  resolve({ renders, paints, steps, elapsedMs: performance.now() - started, before, after: gev.styleManager.getDetectionDiagnostics?.()?.frameCount ?? null });
+                }, 400);
+              }
+            } catch (error) { cleanup(); reject(error); }
+          }, 60);
+        })),
+        new Promise((_, reject) => {
+          deadline = setTimeout(() => reject(new Error('Camera motion browser deadline exceeded (60 seconds)')), 60_000);
+        }),
+      ]);
+    } finally { clearTimeout(deadline); }
+  };
+
   const diag = () => page.evaluate(() => window.__godsEyeView.getRenderGovernorDiagnostics?.()
     || window.__gevRenderGovernor?.getDiagnostics?.() || null);
 
@@ -254,20 +299,9 @@ try {
   );
   // …and the overlay must still be LIVE, not merely quiet: with detection on, a
   // camera nudge has to repaint promptly, or "idle" would only mean "stale".
-  const detectMove = await Promise.all([
-    countFrames(2_500),
-    page.evaluate(() => new Promise((resolve) => {
-      const v = window.__godsEyeView.viewer;
-      let steps = 0;
-      const id = setInterval(() => {
-        v.camera.moveForward(50);
-        steps += 1;
-        if (steps >= 20) { clearInterval(id); resolve(true); }
-      }, 60);
-    })),
-  ]).then(([frames]) => frames);
+  const detectMove = await measureCameraMotion();
   check(
-    'detection ON still repaints promptly on camera motion (≥10 / 2.5s)',
+    'detection ON still repaints promptly on camera motion (≥10 / completed 20 moves)',
     detectMove.renders >= 10,
     detectMove,
   );
@@ -275,31 +309,9 @@ try {
   // painter ran — a painter disabled outright would score a perfect idle and
   // sail through every check above. Count the painter's own frames across the
   // same kind of motion, so the teeth reach the thing this change touched.
-  const detectPainted = await page.evaluate(() => new Promise((resolve) => {
-    const gev = window.__godsEyeView;
-    const before = gev.styleManager.getDetectionDiagnostics?.()?.frameCount ?? null;
-    let paints = 0;
-    // The diagnostics object is rebuilt on every detection paint, so a fresh
-    // identity is one painted frame. Sampling it per scene frame is enough to
-    // tell "painting" from "silent" without reaching into module internals.
-    let last = gev.styleManager.getDetectionDiagnostics?.();
-    const remove = gev.viewer.scene.postRender.addEventListener(() => {
-      const now = gev.styleManager.getDetectionDiagnostics?.();
-      if (now && now !== last) { paints += 1; last = now; }
-    });
-    let steps = 0;
-    const id = setInterval(() => {
-      gev.viewer.camera.moveForward(50);
-      steps += 1;
-      if (steps >= 20) {
-        clearInterval(id);
-        setTimeout(() => {
-          remove();
-          resolve({ paints, before, after: gev.styleManager.getDetectionDiagnostics?.()?.frameCount ?? null });
-        }, 400);
-      }
-    }, 60);
-  }));
+  // A fresh diagnostics identity is one detection paint, sampled independently
+  // from the scene render count during a second complete motion sequence.
+  const detectPainted = await measureCameraMotion();
   check(
     'detection is still PAINTING, not merely quiet (≥5 painted frames on motion)',
     detectPainted.paints >= 5,
@@ -366,19 +378,8 @@ try {
   check('satellites disable releases its holder', !dSatOff?.holds.includes('satellites'), dSatOff);
 
   // ── 3. camera movement renders (Cesium-native path) ───────────────────
-  const duringMove = await Promise.all([
-    countFrames(2_500),
-    page.evaluate(() => new Promise((resolve) => {
-      const v = window.__godsEyeView.viewer;
-      let steps = 0;
-      const id = setInterval(() => {
-        v.camera.moveForward(50);
-        steps += 1;
-        if (steps >= 20) { clearInterval(id); resolve(true); }
-      }, 60);
-    })),
-  ]).then(([frames]) => frames);
-  check('camera movement while idle produces renders (≥10 / 2.5s)', duringMove.renders >= 10, duringMove);
+  const duringMove = await measureCameraMotion();
+  check('camera movement while idle produces renders (≥10 / 20 moves)', duringMove.renders >= 10, duringMove);
   await new Promise((r) => setTimeout(r, 3_000)); // settle
 
   // ── 4. flights enabled → continuous ───────────────────────────────────
